@@ -1,0 +1,1 @@
+{"name":"dnm-cloud-admin","private":true,"version":"3.0.0-admin.1","type":"module","scripts":{"test":"node --test tests/*.test.js"}}

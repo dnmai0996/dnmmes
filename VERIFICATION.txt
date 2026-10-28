@@ -1,0 +1,31 @@
+검증 기록 — 2026-10-28
+버전: 3.0.0-admin.1
+
+완료
+- Node.js v24.22.1에서 node --test tests/*.test.js: 16개 통과 / 실패 0
+- public의 JavaScript 모듈 전부 node --check 구문 검사 통과
+- netlify.toml 구문, publish=public, build command 미설정 확인
+- public/config.js URL/Public Key가 빈 문자열인 상태 확인
+- HTML의 로컬 CSS/JS/안내 링크 파일 존재 확인
+- SQL 정적 검토: RLS 적용 대상 5개 테이블, 정책 11개
+- 신규 계정 기본값: viewer / active=false
+- 비로그인 테이블 권한 없음. 권한 변경은 관리자 확인 RPC로 제한
+- 공개용 키만 프런트엔드 설정. 비밀키 입력 거부
+- 사용자 입력 HTML escaping, 버전 조건부 수정, 저장 실패 메시지 처리
+
+아직 수행하지 않은 검증
+- Supabase 프로젝트에 SQL을 실행한 실제 PostgreSQL 검증
+- 실제 Supabase Auth 로그인 / 사용자별 RLS·권한 통합 테스트
+- GitHub 저장소 생성 및 Netlify 배포
+- 브라우저 화면 렌더링, 휴대폰 터치와 마이크 권한·음성 인식
+- PC와 휴대폰 사이의 실제 공동 DB 저장·조회
+
+테스트는 핵심 JS 로직과 모의 HTTP 응답을 사용했습니다.
+통과 결과가 실제 클라우드 연결·보안 검증 완료를 의미하지 않습니다.
+배포 후 START_HERE.html의 06단계와 역할별 확인을 수행하세요.
+
+제공 범위
+별도 공통관리판: 품목 식별정보, 거래처, 공유메모, 사용자 권한, 변경 이력.
+무기 부품의 제조·검사 실행 지시 및 Routing 데이터는 포함하지 않습니다.
+기존 MySQL/MES 코드나 업무 데이터를 변경·이관하지 않았습니다.
+Ollama 호출, 내부 서버 의존성, .env 파일, 실제 비밀정보는 포함하지 않습니다.
