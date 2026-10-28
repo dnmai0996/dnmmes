@@ -1,4 +1,4 @@
-name: DNM v4.3 verification
+name: DNM v4.4 verification
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -47,3 +47,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f database/10_upgrade_v4_3.sql
           psql -v ON_ERROR_STOP=1 -f database/10_upgrade_v4_3.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/integration_v43.sql
+          psql -v ON_ERROR_STOP=1 -f database/12_upgrade_v4_4.sql
+          psql -v ON_ERROR_STOP=1 -f database/12_upgrade_v4_4.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/integration_v44.sql

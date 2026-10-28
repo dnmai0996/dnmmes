@@ -13,7 +13,7 @@ def check(label,value=True):
  checks.append(label)
 def launch(page,who='admin'):
  html=(BASE/'public/index.html').read_text();html=re.sub(r'<script[^>]*>.*?</script>','',html);html=re.sub(r'<link[^>]+>','',html);page.set_content(html)
- for f in ['styles.css','v41.css','v42.css','navigation.css','v43.css']:page.add_style_tag(content=(BASE/'public'/f).read_text())
+ for f in ['styles.css','v41.css','v42.css','navigation.css','v43.css','v44.css']:page.add_style_tag(content=(BASE/'public'/f).read_text())
  image='data:image/png;base64,'+base64.b64encode((BASE/'public/assets/dnm-logo.png').read_bytes()).decode();modules={}
  for f in (BASE/'public').rglob('*.js'):
   name=f.relative_to(BASE).as_posix();src=f.read_text().replace('assets/dnm-logo.png',image)
@@ -66,7 +66,7 @@ with sync_playwright() as pw:
   p=b.new_page(viewport={'width':1440,'height':960});launch(p);accounts(p)
   check('admin worker account checkbox present',p.locator('[data-account-check]').count()==1)
   check('existing administrator role management retained',p.locator('[data-vaction=accountRole]').count()==1)
-  p.click('#accountHealth');p.wait_for_function("()=>document.querySelector('#accountServiceState').textContent.includes('연결을 확인')")
+  p.click('#accountHealth');p.wait_for_function("()=>document.querySelector('#accountServiceState').textContent.includes('사용자 등록 기능에 연결')")
   check('backend health result rendered')
   p.screenshot(path=str(OUT/'admin-worker-accounts.png'),full_page=False)
   p.click('[data-account-check]');p.wait_for_selector('#v4dialog[open]');check('registration dialog has login checkbox',p.locator('[name=login_user]').is_checked())

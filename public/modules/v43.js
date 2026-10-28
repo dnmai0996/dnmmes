@@ -19,21 +19,21 @@ export class V43Controller extends V421Controller{
  }
  async userAccounts(){
   if(this.ctx.account_management!=='4.3.0'){
-   this.set(notice('사용자 등록 기능을 위해 Supabase에 10_upgrade_v4_3.sql을 먼저 적용하고, Netlify 서버 환경변수 2개 설정 후 배포하세요. 기존 자료는 초기화하지 않습니다.','warning'));return;
+   this.set(notice('계정관리 업데이트 설치를 확인해야 합니다. 사용방법의 담당자 안내를 확인하세요.','warning'));return;
   }
   const [data,profiles]=await Promise.all([this.accounts.list(),this.api.rows('profiles','select=*&order=display_name.asc&limit=1000')]);
   this.loginWorkers=(data.workers||[]).sort((a,b)=>employeeSort({title:a.name,data:a},{title:b.name,data:b}));
   this.loginProfiles=profiles.data||[];
   const q=this.search.trim().toLowerCase();const filtered=this.loginWorkers.filter(x=>!q||[x.name,x.code,x.department,x.position,x.email,ACCOUNT_STATES[x.state]].some(s=>String(s||'').toLowerCase().includes(q)));
   const registered=this.loginWorkers.filter(x=>x.profile_id).length;
-  this.set(`<div class="card"><div class="sectionhead"><div><span class="eyebrow">WORKER LOGIN ACCOUNTS</span><h2>작업자 로그인 사용자 관리</h2></div><button id="accountHealth" type="button" class="secondary">계정 서버 연결 확인</button></div>${notice('직원은 Supabase에 가입하지 않습니다. 아래 로그인 사용자 체크 → 본인 이메일 확인 → 등록 순서입니다. 신규 작업자는 본인 작업 조회·등록·수정 권한으로 시작하며 기존 계정의 권한은 보존합니다.')}<div class="account-warning">초기번호 1111은 공용번호입니다. 당사자가 접속할 때 발급하고 30분 안에 본인 비밀번호로 바꾸게 하십시오. 변경 전 업무자료는 차단되지만, 초기번호를 아는 타인이 먼저 설정할 위험은 남습니다.</div><div class="account-stats"><span>작업자 <b>${this.loginWorkers.length}</b>명</span><span>연결 계정 <b>${registered}</b>명</span><span>미등록 <b>${this.loginWorkers.length-registered}</b>명</span></div>${this.top()}<div id="accountServiceState" role="status"></div>${table(['로그인 사용자','사번 / 성명','부서 / 직책','본인 이메일','계정 상태','관리'],this.sliced(filtered).map(w=>{
+  this.set(`<div class="card"><div class="sectionhead"><div><span class="eyebrow">WORKER LOGIN ACCOUNTS</span><h2>작업자 로그인 사용자 관리</h2></div><button id="accountHealth" type="button" class="secondary">연결 확인</button></div>${notice('로그인 사용자 체크 → 본인 이메일 확인 → 등록 순서로 진행하세요. 기존 권한은 유지됩니다.')}<div class="account-warning">초기번호 1111은 공용번호입니다. 당사자가 접속할 때 발급하고 30분 안에 본인 비밀번호로 바꾸게 하십시오. 변경 전 업무자료는 차단되지만, 초기번호를 아는 타인이 먼저 설정할 위험은 남습니다.</div><div class="account-stats"><span>작업자 <b>${this.loginWorkers.length}</b>명</span><span>연결 계정 <b>${registered}</b>명</span><span>미등록 <b>${this.loginWorkers.length-registered}</b>명</span></div>${this.top()}<div id="accountServiceState" role="status"></div>${table(['로그인 사용자','사번 / 성명','부서 / 직책','본인 이메일','계정 상태','관리'],this.sliced(filtered).map(w=>{
    const protectedUser=w.protected||w.profile_id===this.ctx.profile.id;
    return[`<label class="check account-check"><input type="checkbox" data-account-check="${esc(w.id)}" ${w.enabled?'checked':''} ${protectedUser?'disabled':''} aria-label="${esc(w.name)} 로그인 사용자"> 사용</label>`,esc(w.code)+'<br><strong>'+esc(w.name)+'</strong>',esc(w.department)+'<br>'+esc(w.position),esc(w.email||'등록 시 입력'),`<span class="pill">${esc(ACCOUNT_STATES[w.state]||w.state)}</span>${w.state==='pending'?'<br><small>유효기한 '+esc(clock(w.expires_at))+'</small>':''}`,protectedUser?'관리자 계정 보호':(!w.profile_id?btn('accountEnroll','등록',w.id,'primary'):btn('accountReset','1111 초기화',w.id))];
   }))}<div id="v4pager" class="pagination"></div><p class="muted">계정을 삭제하지 않고 사용을 중지하므로 과거 작업일보·승인·변경이력은 보존됩니다. 이메일 연결 이후 주소 변경은 이 화면에서 지원하지 않습니다.</p></div><div class="card"><h2>기존 계정 및 역할</h2><p class="muted">본인의 비밀번호는 화면 상단 ‘비밀번호 변경’에서 바꿉니다. 관리자 역할 승격·업무 메뉴 권한은 기존 기능을 유지합니다.</p>${table(['이메일','성명','역할','상태','관리'],this.loginProfiles.map(p=>[esc(p.email),esc(p.display_name),esc(p.role),p.active?'활성':'차단',p.id===this.ctx.profile.id?'본인':btn('accountRole','역할·활성',p.id)]))}</div>`);
   this.pageFooter(filtered);
   const searchInput=$('#v4search');if(searchInput)searchInput.placeholder='성명·사번·부서·이메일 검색';
   all('[data-account-check]').forEach(c=>c.onchange=()=>{const w=this.loginWorkers.find(x=>x.id===c.dataset.accountCheck);const enable=c.checked;c.checked=!!w.enabled;this.accountDialog(w,enable?(w.profile_id?'reset':'provision'):'disable');});
-  $('#accountHealth').onclick=async()=>{const el=$('#accountServiceState');el.textContent='계정 서버 확인 중…';try{await this.accounts.request('status');el.innerHTML=notice('계정 서버·DB 확장 연결을 확인했습니다.');}catch(e){el.innerHTML=notice(e.message,'warning');}};
+  $('#accountHealth').onclick=async()=>{const el=$('#accountServiceState');el.textContent='계정 서버 확인 중…';try{await this.accounts.request('status');el.innerHTML=notice('사용자 등록 기능에 연결되었습니다.');}catch(e){el.innerHTML=notice(e.message,'warning');}};
  }
  accountDialog(w,action){
   if(!w||w.protected||w.profile_id===this.ctx.profile.id)throw Error('본인·관리자 계정은 이 기능으로 초기화하지 않습니다.');

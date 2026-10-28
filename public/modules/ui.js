@@ -1,3 +1,5 @@
+import {userMessage} from './error-info.js';
+import {beginActivity} from './activity.js';
 import {esc} from '../core.js';
 import {STATUS,csv} from './domain.js';
 export {esc};
@@ -11,7 +13,7 @@ export const area=(name,label,value='',extra='')=>`<label>${esc(label)}<textarea
 export const select=(name,label,options,value='',extra='')=>`<label>${esc(label)}<select name="${esc(name)}" ${extra}>${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
 export const table=(heads,rows)=>`<div class="table-wrap"><table><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(x=>`<td>${x??''}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${heads.length}" class="empty">자료가 없습니다. 신규 등록 또는 자료 가져오기를 진행하세요.</td></tr>`}</tbody></table></div>`;
 export const notice=(s,kind='info')=>`<div class="notice ${kind}">${esc(s)}</div>`;
-export function message(s,kind='error'){
+export function message(s,kind='error'){if(kind==='error')s=userMessage(s);
  const d=$('#v4dialog');let e=d?.open?$('#v4message'):$('#message');if(!e)return;e.hidden=!s;e.className='message '+kind;e.textContent=s;e.setAttribute('role',kind==='error'?'alert':'status');e.setAttribute('aria-live',kind==='error'?'assertive':'polite');
 }
 let cleanup=()=>{};
@@ -19,7 +21,7 @@ export function closeModal(){const d=$('#v4dialog');if(d?.dataset.busy==='true')
 export function onModalClose(f){cleanup=f;}
 export function modal(title,body,onSubmit=null,label='저장'){
  let d=$('#v4dialog');if(!d){d=document.createElement('dialog');d.id='v4dialog';document.body.append(d);}if(d.open)closeModal();d.dataset.busy='false';
- d.innerHTML=`<form id="v4form"><header><div><small>DNM • CLOUD MES 4.3</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
+ d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.4</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
  $('#v4cancel').onclick=$('#v4dismiss').onclick=closeModal;d.oncancel=e=>{if(d.dataset.busy==='true'){e.preventDefault();return;}cleanup();cleanup=()=>{};};d.showModal();
  let key=crypto.randomUUID(),frozen=null;
  $('#v4form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요.'),true);
@@ -31,7 +33,8 @@ export function modal(title,body,onSubmit=null,label='저장'){
  };
  return d;
 }
-export function busy(v){const d=$('#v4dialog');d.dataset.busy=String(v);for(const id of ['#v4cancel','#v4dismiss','#v4submit'])if($(id))$(id).disabled=v;$('#v4form')?.setAttribute('aria-busy',String(v));}
+let modalActivity=null;
+export function busy(v){if(v&&!modalActivity)modalActivity=beginActivity('처리 중입니다…',3);if(!v&&modalActivity){modalActivity.end();modalActivity=null;}const d=$('#v4dialog');d.dataset.busy=String(v);for(const id of ['#v4cancel','#v4dismiss','#v4submit'])if($(id))$(id).disabled=v;$('#v4form')?.setAttribute('aria-busy',String(v));}
 export function download(name,content,type='application/json'){const blob=new Blob([content],{type}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 export function exportCSV(name,rows){download(name,csv(rows),'text/csv;charset=utf-8');}
 export function printSheet(title,body){

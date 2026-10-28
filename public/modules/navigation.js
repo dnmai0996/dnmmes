@@ -6,7 +6,7 @@ export const NAV_LABELS={
  instructions:'작업지시 · 배포현황',workCards:'작업일보 사전양식',touchWork:'터치 작업입력',voiceWork:'음성 작업입력',worklogs:'작업일보',
  purchase:'구매요청 · 결재',receipts:'발주 · 입고 · 반품',settlement:'정산',quality:'품질 · 출하',documents:'품질문서 대장',
  equipment:'설비관리',instruments:'계측기관리',products:'제품',materials:'자재',employees:'작업자',processes:'공정',customers:'매출처',suppliers:'매입처',assignments:'설비·작업자 연결',catalog:'공구·공급업체',
- seedData:'첨부자료 일괄등록',workforceSetup:'계정·설비 일괄연결',sourceReview:'기준정보 검토·활성화',archives:'과거 Routing 참조',notes:'공유메모',profiles:'사용자 등록·초기화',access:'사용자별 권한 · 전결',audit:'변경 이력',backup:'백업 · 운영점검',home:'공통관리 현황'
+ seedData:'첨부자료 일괄등록',workforceSetup:'계정·설비 일괄연결',sourceReview:'기준정보 검토·활성화',archives:'과거 Routing 참조',notes:'공유메모',profiles:'사용자 등록·초기화',access:'사용자별 권한 · 전결',audit:'변경 이력',backup:'백업 · 복원',home:'공통관리 현황'
 };
 export function groupFor(page){return GROUPS.find(([,pages])=>pages.includes(page))?.[0]||'';}
 export function firstPage(ctx){

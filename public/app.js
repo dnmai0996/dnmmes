@@ -1,8 +1,11 @@
+import {userMessage} from './modules/error-info.js';
 import {SUPABASE_URL,SUPABASE_PUBLIC_KEY} from './config.js';
 import {VERSION,esc,settings,listQuery,adminListQuery,cleanRecord} from './core.js';
 import {PortalApi} from './api.js';
 import {voiceFor} from './speech.js';
-import {V43Controller as MesController} from './modules/v43.js';
+import {V44Controller as MesController} from './modules/v44.js';
+import {beginActivity} from './modules/activity.js';
+import {showHelp} from './modules/help-v44.js';
 import {AccountService,passwordIssue} from './modules/accounts.js';
 import {pageAllowed,permit} from './modules/permissions.js';
 import {MesService} from './modules/service.js';
@@ -16,13 +19,13 @@ let mes,context;
 const roleLabel={admin:'관리자',member:'담당자',viewer:'조회자'};
 let api,me,tab='home',page=1,query='',status='active',generation=0,stopVoice=()=>{};
 const clock=v=>new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
-function message(text,error=false){const box=$('#editor').open?$('#dialogMessage'):$('#message');if(box){box.hidden=false;box.className='message'+(error?' error':'')+($('#editor').open?' dialog-message':'');box.textContent=text;}}
+function message(text,error=false){if(error)text=userMessage(text);const box=$('#editor').open?$('#dialogMessage'):$('#message');if(box){box.hidden=false;box.className='message'+(error?' error':'')+($('#editor').open?' dialog-message':'');box.textContent=text;}}
 function fail(e){const text=e?.message||'처리 결과를 확인하지 못했습니다. 다시 조회하세요.';message(text,true);if(api&&!api.session)login(text);}
 function guarded(fn){return async()=>{try{await fn();}catch(e){fail(e);}};}
 function login(msg='',success=false){
  generation++;me=null;document.body.classList.remove('tv-mode','nav-drawer-open');document.querySelector('#v4dialog')?.close();stopVoice();$('#editor').close();
- $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>수주에서 생산·품질까지,<br>현장의 기록을 한 곳에서 연결합니다.</p></section><section class="loginbox"><div><span class="tag">클라우드 MES · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">관리자가 등록한 본인 이메일로 로그인하세요. 초기번호를 받은 경우 먼저 본인 비밀번호를 설정합니다.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg&&!success?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p><small>Ollama 미연결 · 기본 업무 사용 가능</small></div></section></div>`;
- $('#message').insertAdjacentHTML('afterend',`<details id="diagnostics"><summary>Supabase 연결 진단</summary><p class="message">연결 주소: ${esc(api.c.url)}</p><button id="checkConnection" type="button" class="secondary full">연결 확인 (비밀번호 불필요)</button><div id="diagnosticResult" class="message" role="status" hidden></div></details>`);
+ $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>수주에서 생산·품질까지,<br>현장의 기록을 한 곳에서 연결합니다.</p></section><section class="loginbox"><div><span class="tag">클라우드 MES · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">관리자가 등록한 본인 이메일로 로그인하세요. 초기번호를 받은 경우 먼저 본인 비밀번호를 설정합니다.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg&&!success?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p></div></section></div>`;
+ $('#message').insertAdjacentHTML('afterend',`<details id="diagnostics"><summary>로그인 도움말 · 연결 확인</summary><p class="message">연결 주소: ${esc(api.c.url)}</p><button id="checkConnection" type="button" class="secondary full">연결 확인 (비밀번호 불필요)</button><div id="diagnosticResult" class="message" role="status" hidden></div></details>`);
  $('#checkConnection').onclick=async()=>{
   const button=$('#checkConnection'),box=$('#diagnosticResult');button.disabled=true;box.hidden=false;box.className='message';box.textContent='인증 서비스 연결을 확인하고 있습니다…';
   try{const result=await api.checkConnection();
@@ -32,7 +35,7 @@ function login(msg='',success=false){
    if(['CONNECTION_FAILED','TIMEOUT'].includes(x.code))box.textContent+='\n확인 순서: 위 주소를 Supabase의 실제 Project URL과 대조 → 프로젝트 실행 상태 확인 → 휴대폰 모바일 데이터로 같은 Netlify 주소에서 연결 진단. 브라우저 차단·DNS·통신 오류는 이 결과만으로 구분할 수 없습니다.';
   }finally{button.disabled=false;}
  };
- $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;try{const f=Object.fromEntries(new FormData(e.target));const email=f.email.trim().toLowerCase();if(f.password==='1111'){const result=await new AccountService(api).temporary(email,f.password);api.keep(null);initialPassword(result);return;}await api.login(email,f.password);await enter();}catch(x){message(x.message,true);if(['CONNECTION_FAILED','TIMEOUT','INVALID_RESPONSE','HTTP_401'].includes(x.code)&&$('#diagnostics'))$('#diagnostics').open=true;}finally{b.disabled=false;}};
+ $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;const activity=beginActivity('로그인 중입니다…');try{const f=Object.fromEntries(new FormData(e.target));const email=f.email.trim().toLowerCase();if(f.password==='1111'){const result=await new AccountService(api).temporary(email,f.password);api.keep(null);initialPassword(result);return;}await api.login(email,f.password);await enter();}catch(x){message(x.message,true);if(['CONNECTION_FAILED','TIMEOUT','INVALID_RESPONSE','HTTP_401'].includes(x.code)&&$('#diagnostics'))$('#diagnostics').open=true;}finally{b.disabled=false;activity.end();}};
 }
 function initialPassword(setup){
  me=null;generation++;document.body.classList.remove('tv-mode','nav-drawer-open');
@@ -51,7 +54,7 @@ async function enter(){
  if(!me?.active){let state;try{state=(await api.request('/rest/v1/rpc/dnm_v43_my_account_status')).data;}catch{}await api.logout().catch(()=>{});login(state?.managed?'로그인 사용이 중지되었거나 비밀번호 설정이 필요합니다. 관리자에게 확인하고 초기번호를 받은 경우 1111로 접속하세요.':'계정 활성화 대기 중입니다. 관리자에게 프로그램 내 사용자 등록을 요청하세요.');return;}
  try{context=await new MesService(api).context();if(context?.profile?.id!==me.id||!['4.0.0','4.1.0','4.2.0'].includes(context?.version))throw Error('v4 데이터베이스 응답을 확인하지 못했습니다.');}catch(e){context={profile:me,capabilities:[],schemaError:e.message};}
  mes=new MesController(api,context,(target,detail)=>{navigate(target,detail).catch(fail);});
- tab=context.version==='4.2.0'?firstPage(context):'home';shell({resetPage:true});await load();if(context.version!=='4.2.0')message('v4.2 DB 확장 전입니다. 기존 config.js와 자료를 보존한 뒤 database/08_upgrade_v4_2.sql 적용 여부를 확인하세요.',true);
+ tab=context.version==='4.2.0'?firstPage(context):'home';shell({resetPage:true});await load();if(context.version!=='4.2.0')message('업데이트 설치를 확인해야 합니다. 관리자에게 문의하세요.',true);
 }
 const menuKey=()=>`dnm-menu:${me?.id||'none'}`;
 function menuState(){try{return restoreMenuState(JSON.parse(localStorage.getItem(menuKey())||'{}'));}catch{return{};}}
@@ -61,9 +64,9 @@ let sidebarScroll=0,navigationBusy=false;
 
 async function refreshContext(){const c=await new MesService(api).context();if(!c?.profile?.active||c.profile.id!==me.id){await api.logout();login('권한 또는 계정 상태가 변경되었습니다. 다시 로그인하세요.');return false;}context=c;me=c.profile;mes.setContext(c);return true;}
 async function navigate(target,detail){
- if(mes.loadingImport){message('자료묶음 처리 중에는 화면을 유지하세요.',true);return;}
+ if(mes.loadingImport||mes.loadingBackup){message('처리 중에는 현재 화면을 유지하세요.',true);return;}
  if(navigationBusy)return;
- navigationBusy=true;
+ navigationBusy=true;const pending=beginActivity('화면을 여는 중입니다…');
  try{
   if(!await refreshContext())return;
   const oldTab=tab;
@@ -75,7 +78,7 @@ async function navigate(target,detail){
   if(detail&&tab===target){mes.page=target;mes.search='';mes.pageNo=1;mes.detail=detail;}
   else if(oldTab===target)mes.detail=null;
   await load();
- }finally{navigationBusy=false;}
+ }finally{navigationBusy=false;pending.end();}
 }
 function setMobileMenu(open){
  const shell=document.querySelector('.app-shell'),nav=$('#sideNav'),button=$('#mobileNav'),main=document.querySelector('.main-pane'),veil=$('#navBackdrop');
@@ -90,7 +93,7 @@ function shell({resetPage=false}={}){
  const oldMenu=$('#sideMenu');if(oldMenu)sidebarScroll=oldMenu.scrollTop;
  const tabs=permittedTabs();
  document.body.classList.remove('nav-drawer-open');
- $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar" id="sideNav" aria-label="디엔엠 업무 탐색"><div class="sidebar-brand"><div><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><small>구매·생산 통합관리</small></div><button type="button" id="closeNav" class="nav-close" aria-label="업무 메뉴 닫기">✕</button></div><nav id="sideMenu" aria-label="업무 메뉴">${renderNavigation(tabs,tab,menuState())}</nav><footer>${VERSION}<br>공동 데이터 · Supabase<br>Ollama 연결 불필요</footer></aside><button id="navBackdrop" type="button" class="nav-backdrop" aria-label="업무 메뉴 닫기" tabindex="-1" hidden></button><div class="main-pane"><header class="topbar"><button type="button" id="mobileNav" class="secondary mobile-nav" aria-expanded="false" aria-controls="sideNav">☰ 메뉴</button><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호 변경</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><div class="page-path" aria-label="현재 위치">${breadcrumbMarkup(tab)}</div><h1 id="title" tabindex="-1">${labels[tab]||'사용권한 확인'}</h1><span class="muted">허용된 메뉴만 표시 · 등록/수정 권한 별도</span></div><div class="actions"><button id="vhelp" class="secondary">❔ 사용방법</button><button id="reload" class="secondary">새로고침</button></div></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
+ $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar" id="sideNav" aria-label="디엔엠 업무 탐색"><div class="sidebar-brand"><div><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><small>구매·생산 통합관리</small></div><button type="button" id="closeNav" class="nav-close" aria-label="업무 메뉴 닫기">✕</button></div><nav id="sideMenu" aria-label="업무 메뉴">${renderNavigation(tabs,tab,menuState())}</nav><footer>${VERSION}<br>DNM 업무관리</footer></aside><button id="navBackdrop" type="button" class="nav-backdrop" aria-label="업무 메뉴 닫기" tabindex="-1" hidden></button><div class="main-pane"><header class="topbar"><button type="button" id="mobileNav" class="secondary mobile-nav" aria-expanded="false" aria-controls="sideNav">☰ 메뉴</button><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호 변경</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><div class="page-path" aria-label="현재 위치">${breadcrumbMarkup(tab)}</div><h1 id="title" tabindex="-1">${labels[tab]||'사용권한 확인'}</h1><span class="muted"></span></div><div class="actions"><button id="vhelp" class="secondary">❔ 사용방법</button><button id="reload" class="secondary">새로고침</button></div></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
  all('[data-tab]').forEach(b=>b.onclick=guarded(()=>navigate(b.dataset.tab)));
  for(const d of all('[data-navgroup]'))d.addEventListener('toggle',()=>{const state=menuState();state[d.dataset.navgroup]=d.open;saveMenu(state);});
  const menu=$('#sideMenu');menu.scrollTop=sidebarScroll;
@@ -109,8 +112,8 @@ function shell({resetPage=false}={}){
    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
   }
  };
- $('#vhelp').onclick=()=>{if(!legacyTabs.includes(tab))mes.help();else helpModal(labels[tab]+' 사용방법','<p>조회·등록·수정은 사용자별로 분리됩니다. 관리자는 사용자 관리에서 작업자를 로그인 사용자로 등록합니다. 직원은 Supabase에 접속할 필요가 없습니다.</p><p>그룹 제목을 눌러 하위 메뉴를 펼치거나 접습니다. 선택된 메뉴는 왼쪽에서 강조되며 상단 현재 위치에 같은 화면명이 표시됩니다.</p>');};
- $('#reload').onclick=guarded(()=>navigate(tab));$('#logout').onclick=guarded(async()=>{if(mes.loadingImport)throw Error('일괄등록 처리 종료 후 로그아웃하세요.');try{await api.logout();}finally{login();}});
+ $('#vhelp').onclick=()=>showHelp(tab,me.role,context);
+ $('#reload').onclick=guarded(()=>navigate(tab));$('#logout').onclick=guarded(async()=>{if(mes.loadingImport||mes.loadingBackup)throw Error('처리가 끝난 후 로그아웃하세요.');try{await api.logout();}finally{login();}});
  $('#password').onclick=()=>openForm('비밀번호 변경',field('current','현재 비밀번호','','password','required autocomplete="current-password"')+field('next','새 비밀번호 (12자 이상)','','password','required minlength="12" autocomplete="new-password"')+field('repeat','새 비밀번호 확인','','password','required minlength="12" autocomplete="new-password"'),async f=>{
   if(f.next!==f.repeat)throw Error('새 비밀번호가 일치하지 않습니다.');if(f.current===f.next)throw Error('기존과 다른 비밀번호를 사용하세요.');const issue=passwordIssue(f.next);if(issue)throw Error(issue);
   if(context?.account_management==='4.3.0')await new AccountService(api).request('change_password',{current:f.current,password:f.next,repeat:f.repeat});
@@ -130,7 +133,7 @@ async function load(){
   if(context?.version==='4.2.0'&&!pageAllowed(context,kind))throw Error('조회권한이 변경되었습니다. 새로고침하세요.');
   if(!legacyTabs.includes(kind)){await mes.load(kind);if(ticket!==generation)return;}else if(kind==='home'){
    const counts=await Promise.all(['products','partners','notes'].map(k=>api.rows(k,'select=id&limit=1')));if(ticket!==generation)return;
-   $('#content').innerHTML=`<div class="metrics">${counts.map((r,i)=>`<div class="card metric"><span>${['제품','거래처','공유메모'][i]}</span><b>${r.total||0}</b></div>`).join('')}</div><div class="card"><h2>한 곳에 저장하고, 함께 확인합니다.</h2><p class="muted">자료는 연결된 Supabase에 저장됩니다. 다른 기기의 변경은 새로고침하거나 잠시 기다리면 확인할 수 있습니다.</p><div class="flow">품목 기준정보 · 제품코드, 품명, Project, 단위<br>거래처 · 고객사와 공급업체 연락정보<br>공유메모 · 음성 또는 직접 입력 후 확인·저장</div></div><div class="card"><h2>연결 상태</h2><p>공동 DB: 연결됨</p><p>Ollama: 미연결 — 이 앱의 기본 기능에는 필요하지 않습니다.</p><small>음성 입력은 지원 브라우저에서 사용합니다. 인식 결과는 저장 전에 수정할 수 있습니다.</small></div>`;
+   $('#content').innerHTML=`<div class="metrics">${counts.map((r,i)=>`<div class="card metric"><span>${['제품','거래처','공유메모'][i]}</span><b>${r.total||0}</b></div>`).join('')}</div><div class="card"><h2>한 곳에 저장하고, 함께 확인합니다.</h2><p class="muted">자료는 회사 업무시스템에 함께 저장됩니다. 다른 기기의 변경은 새로고침하거나 잠시 기다리면 확인할 수 있습니다.</p><div class="flow">품목 기준정보 · 제품코드, 품명, Project, 단위<br>거래처 · 고객사와 공급업체 연락정보<br>공유메모 · 음성 또는 직접 입력 후 확인·저장</div></div><div class="card"><h2>연결 상태</h2><p>업무시스템에 연결되어 있습니다.</p><small>음성 입력은 지원 브라우저에서 사용합니다. 인식 결과는 저장 전에 수정할 수 있습니다.</small></div>`;
   }else{
    let q=['products','partners','notes'].includes(kind)?listQuery(kind,page,query,status):adminListQuery(kind,page,query);
    const {data:rows,total}=await api.rows(kind,q);if(ticket!==generation)return;
@@ -158,7 +161,7 @@ function openForm(title,body,save,{voice=false}={}){
  const close=()=>{stopVoice();d.close();};$('#close').onclick=close;d.oncancel=()=>stopVoice();
  if(voice)stopVoice=voiceFor($('#noteBody'),$('#voice'),$('#voiceState'));
  d.querySelector('form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요. 표시된 입력란을 수정한 후 저장하세요.',true),true);
- d.querySelector('form').onsubmit=async e=>{e.preventDefault();const button=$('#save'),cancel=$('#close');let unknown=false;button.disabled=true;cancel.disabled=true;d.oncancel=x=>x.preventDefault();stopVoice();try{await save(Object.fromEntries(new FormData(e.target)));close();if(me){try{await load();message('저장했습니다.');}catch(x){message('저장은 완료됐지만 목록을 다시 조회하지 못했습니다. '+x.message,true);}}}catch(x){message(x.message,true);unknown=!!x.unknown;if(unknown)button.textContent='닫고 결과를 확인하세요';}finally{button.disabled=unknown;cancel.disabled=false;d.oncancel=()=>stopVoice();}};
+ d.querySelector('form').onsubmit=async e=>{e.preventDefault();const button=$('#save'),cancel=$('#close');let unknown=false;button.disabled=true;cancel.disabled=true;const wait=beginActivity('저장 중입니다…');d.oncancel=x=>x.preventDefault();stopVoice();try{await save(Object.fromEntries(new FormData(e.target)));close();if(me){try{await load();message('저장했습니다.');}catch(x){message('저장은 완료됐지만 목록을 다시 조회하지 못했습니다. '+x.message,true);}}}catch(x){message(x.message,true);unknown=!!x.unknown;if(unknown)button.textContent='닫고 결과를 확인하세요';}finally{wait.end();button.disabled=unknown;cancel.disabled=false;d.oncancel=()=>stopVoice();}};
 }
 function edit(kind,r){
  let body='';if(kind==='notes')body=field('title','제목',r?.title,'text','required maxlength="160"')+`<label>내용<textarea id="noteBody" name="body" required maxlength="10000">${esc(r?.body)}</textarea></label><div class="speech-row"><button id="voice" type="button" class="secondary">음성 입력</button><span id="voiceState" role="status">브라우저 음성인식은 외부 서비스에서 처리될 수 있습니다. 인식 결과를 확인한 후 저장하세요.</span></div>`;
@@ -170,8 +173,8 @@ function edit(kind,r){
 }
 function access(r){openForm('사용자 활성화·권한',`<p>${esc(r.email)}</p>${field('name','성명',r.display_name,'text','required maxlength="100"')}<label>역할<select name="role">${Object.entries(roleLabel).map(([v,t])=>`<option value="${v}" ${v===r.role?'selected':''}>${t}</option>`).join('')}</select></label><label class="check"><input name="active" type="checkbox" ${r.active?'checked':''}>사용 허용</label><p class="muted">관리자: 사용자 관리와 모든 자료 수정<br>담당자: 사용자별 메뉴·조회·등록·수정 권한 별도 지정 필요<br>조회자: 허용된 메뉴의 조회만 가능</p>`,f=>api.access({p_id:r.id,p_version:r.version,p_name:f.name,p_role:f.role,p_active:f.active==='on'}));}
 try{api=new PortalApi(settings(SUPABASE_URL,SUPABASE_PUBLIC_KEY));if(api.session)await enter();else login();}catch(e){if(api)login(e.message);else{$('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><h1>클라우드 업무포털</h1><p>내부 서버 없이 PC와 휴대폰을 연결합니다.</p></section><section class="loginbox"><div><span class="tag off">연결 설정 필요</span><h2>두 값을 입력하면 시작할 수 있습니다.</h2><p>${esc(e.message)}</p><ol><li>Supabase DB 초기 설정</li><li>config.js의 URL·공개용 키 입력</li><li>Netlify에 public 폴더 배포</li></ol><p>아직 DB에 연결되지 않았습니다. 로그인이나 저장이 된 것처럼 표시하지 않습니다.</p><a href="setup.html">실제 설치 순서 열기</a></div></section></div>`;}}
-setInterval(()=>{if(!me||navigationBusy||mes?.loadingImport||!['dashboard','orders','routing','instructions','touchWork','voiceWork','worklogs','purchase','receipts','settlement','quality'].includes(tab)||document.hidden||($('#editor').open||document.querySelector('#v4dialog')?.open)||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;(async()=>{const contextSignature=c=>JSON.stringify([c?.profile?.role,c?.permissions,c?.capabilities]);const before=contextSignature(context);if(!await refreshContext())return;if(before!==contextSignature(context)){if(!pageAllowed(context,tab))tab=firstPage(context);shell();}await load();})().catch(fail);},15000);
-window.addEventListener('beforeunload',e=>{if(mes?.loadingImport){e.preventDefault();e.returnValue='';}});
+setInterval(()=>{if(!me||navigationBusy||mes?.loadingImport||mes?.loadingBackup||!['dashboard','orders','routing','instructions','touchWork','voiceWork','worklogs','purchase','receipts','settlement','quality'].includes(tab)||document.hidden||($('#editor').open||document.querySelector('#v4dialog')?.open)||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;(async()=>{const contextSignature=c=>JSON.stringify([c?.profile?.role,c?.permissions,c?.capabilities]);const before=contextSignature(context);if(!await refreshContext())return;if(before!==contextSignature(context)){if(!pageAllowed(context,tab))tab=firstPage(context);shell();}await load();})().catch(fail);},15000);
+window.addEventListener('beforeunload',e=>{if(mes?.loadingImport||mes?.loadingBackup){e.preventDefault();e.returnValue='';}});
 
 window.addEventListener('resize',()=>{
  if(!me)return;

@@ -10,7 +10,7 @@ export class V421Controller extends V42Controller{
   if(page!==this.page){this.search='';this.pageNo=1;this.detail=null;this.selected.clear();}
   this.page=page;
   if(!pageAllowed(this.ctx,page)){this.set(notice('작업지시 조회권한이 없습니다. 관리자에게 Routing 조회권한을 요청하세요.','warning'));return;}
-  if(this.ctx?.version!=='4.2.0'){this.set(notice('기존 v4.2 DB 확장(08)이 필요합니다. 메뉴 업데이트를 위해 DB를 초기화하지 마세요.','warning'));return;}
+  if(this.ctx?.version!=='4.2.0'){this.set(notice('업데이트 설치 확인이 필요합니다. 자료를 초기화하지 말고 관리자에게 문의하세요.','warning'));return;}
   return this.instructions();
  }
  async instructions(){
