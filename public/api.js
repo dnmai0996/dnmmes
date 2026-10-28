@@ -12,7 +12,7 @@ function responseFailure(path, method, code){
 }
 
 export class PortalApi{
- constructor(config,{storage=sessionStorage,fetcher=fetch}={}){
+ constructor(config,{storage=sessionStorage,fetcher=(...args)=>globalThis.fetch(...args)}={}){
   this.c=config;this.storage=storage;this.fetcher=fetcher;this.key='dnm-portal-session:'+config.url;
   try{this.session=JSON.parse(storage.getItem(this.key));}catch{this.session=null;}
  }
