@@ -1,0 +1,47 @@
+DNM 공통관리판 로그인 진단 패치 — 3.0.1-admin.1
+대상: 이전에 제공한 3.0.0-admin.1
+
+현재 오류의 의미
+기존 로그인 화면의 '응답을 확인하지 못했습니다. 저장됐을 수...'는
+로그인 요청에도 자료 저장용 오류 문구를 사용한 프로그램 오류입니다.
+이 화면만으로 비밀번호 오류나 접속 장애의 정확한 원인을 판단할 수 없습니다.
+
+적용: GitHub에서 public 폴더를 엽니다.
+Add file → Upload files에서 이 압축의 public 폴더 안에 있는 아래 3개 파일을
+직접 끌어 넣고 Commit changes를 누릅니다.
+  api.js
+  app.js
+  core.js
+기존의 같은 경로 파일을 교체합니다. public/public으로 한 겹 더 넣지 마세요.
+
+본인이 입력한 기존 public/config.js는 유지합니다.
+이 패치에는 config.js가 없습니다. DB SQL 재실행도 필요하지 않습니다.
+netlify.toml과 배포 위치(public)도 기존 값을 유지합니다.
+
+Netlify Deploys에서 Published 완료 → https://dnmmes.netlify.app 열기
+→ Ctrl+F5 → 화면 상단 버전 3.0.1-admin.1 확인
+→ 로그인 아래 'Supabase 연결 진단' 펼치기
+→ '연결 확인 (비밀번호 불필요)' 누르기
+
+진단 화면에는 실제 Project URL과 상태만 표시합니다.
+비밀번호, 공개용 키 전체, 로그인 토큰은 표시하지 않습니다.
+진단은 인증 서비스의 공개 설정을 GET으로 조회하며 로그인/업무 DB 저장을 하지 않습니다.
+
+결과 읽는 방법
+- 정상 조회: 인증 서비스에 도달함. 이제 이메일 로그인과 DB 권한을 확인합니다.
+- HTTP 401: 같은 프로젝트의 Project URL과 Publishable key인지 확인합니다.
+- HTTP 404: 프로젝트 주소와 인증 서비스 경로를 확인합니다.
+- HTTP 429: 잠시 후 다시 요청합니다.
+- HTTP 5xx: Supabase 프로젝트 실행 상태와 서비스 상태를 확인합니다.
+- 이메일 로그인 꺼짐: Authentication → Sign In / Providers → Email 확인.
+- CONNECTION_FAILED / TIMEOUT: 주소·DNS·브라우저 차단·통신 문제 등이 가능.
+  Supabase Project URL과 화면 주소를 대조하고 프로젝트 실행 상태를 확인합니다.
+  휴대폰 Wi-Fi를 끄고 모바일 데이터로 같은 앱의 연결 진단도 실행합니다.
+  현재 결과만으로 세부 네트워크 원인을 단정하지 않습니다.
+
+다음 확인이 필요하면 연결 진단 결과 화면을 공유하세요.
+비밀번호와 키 전체는 공유하지 마세요.
+
+검증: 자동 테스트 24개 통과, JavaScript 구문 검사 통과.
+실제 Supabase/Netlify/사용자 브라우저에서의 로그인 검증은 아직 수행하지 않았습니다.
+tests 폴더는 개발자용입니다. 기존 소스의 tests에 합친 뒤 node --test tests/*.test.js로 실행합니다.
