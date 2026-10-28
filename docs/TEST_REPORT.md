@@ -1,3 +1,5 @@
+> v4.3 계정 기능은 FEATURE_MATRIX_v4_3.md, TEST_REPORT_v4_3.md 및 UPGRADE_v4_3_KO.txt를 우선 참조하십시오. 아래는 기존 자료/업무 기능 기록입니다.
+
 # DNM Cloud MES v4.2 검증 기록
 
 제작·검토일: 2026-10-28

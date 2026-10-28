@@ -5,3 +5,5 @@ Current change request: 12-field Excel import, 8 masters, exact-part templates, 
 Reviewed local sources: 수주자료_20261027110753(2).xlsx; RoutingSheet_작업일지(1).pdf; prior v4 source and tests.
 Original private attachments are NOT bundled.
 No live GitHub/Netlify/Supabase changes made.
+
+V4.3 base: DNM_Cloud_MES_v4_2_1.zip. User request: in-app worker email registration, temporary1111, mandatory first password and self change. No real credentials or production data added.
