@@ -2,13 +2,14 @@ import {SUPABASE_URL,SUPABASE_PUBLIC_KEY} from './config.js';
 import {VERSION,esc,settings,listQuery,adminListQuery,cleanRecord} from './core.js';
 import {PortalApi} from './api.js';
 import {voiceFor} from './speech.js';
-import {V42Controller as MesController} from './modules/v42.js';
-import {GROUPS,pageAllowed,permit} from './modules/permissions.js';
+import {V421Controller as MesController} from './modules/v421.js';
+import {pageAllowed,permit} from './modules/permissions.js';
 import {MesService} from './modules/service.js';
+import {NAV_LABELS as labels,renderNavigation,breadcrumbMarkup,firstPage,restoreMenuState,keepSelectedVisible} from './modules/navigation.js';
 import {can} from './modules/domain.js';
 import {modal as helpModal} from './modules/ui.js';
-const $=s=>document.querySelector(s),all=s=>[...document.querySelectorAll(s)];
-const labels={dashboard:'작업진척 대시보드',orders:'고객 수주',sourceOrders:'수주 원본 82열',routing:'Routing · 작업지시',touchWork:'터치 작업입력',voiceWork:'음성 작업입력',worklogs:'작업일보',purchase:'구매요청 · 결재',receipts:'발주 · 입고 · 반품',settlement:'정산',quality:'품질 · 출하',documents:'품질문서 대장',products:'제품',materials:'자재',processes:'공정',customers:'매출처',suppliers:'매입처',equipment:'설비대장',instruments:'계측기대장',employees:'작업자',assignments:'설비·작업자 연결',templates:'제품 Routing 템플릿',catalog:'공구·공급업체',notes:'공유메모',profiles:'사용자 관리',access:'사용자별 권한 · 전결',audit:'변경 이력',backup:'백업 · 운영점검',home:'공통관리 현황',seedData:'첨부자료 일괄등록',sourceReview:'기준정보 검토·활성화',workforceSetup:'계정·설비 일괄연결',routeCandidates:'Routing 원문 후보',routingSetup:'수주 → Routing 초안',workCards:'작업일보 사전양식',archives:'과거 Routing 참조'};
+const $=s=>document.querySelector(s),all=(s,root=document)=>[...root.querySelectorAll(s)];
+
 const legacyTabs=['home','notes','profiles','audit'];
 let mes,context;
 const roleLabel={admin:'관리자',member:'담당자',viewer:'조회자'};
@@ -18,7 +19,7 @@ function message(text,error=false){const box=$('#editor').open?$('#dialogMessage
 function fail(e){const text=e?.message||'처리 결과를 확인하지 못했습니다. 다시 조회하세요.';message(text,true);if(api&&!api.session)login(text);}
 function guarded(fn){return async()=>{try{await fn();}catch(e){fail(e);}};}
 function login(msg=''){
- generation++;me=null;document.body.classList.remove('tv-mode');document.querySelector('#v4dialog')?.close();stopVoice();$('#editor').close();
+ generation++;me=null;document.body.classList.remove('tv-mode','nav-drawer-open');document.querySelector('#v4dialog')?.close();stopVoice();$('#editor').close();
  $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>수주에서 생산·품질까지,<br>현장의 기록을 한 곳에서 연결합니다.</p></section><section class="loginbox"><div><span class="tag">클라우드 MES · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">회사에서 등록한 이메일과 비밀번호를 사용하세요.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p><small>Ollama 미연결 · 기본 업무 사용 가능</small></div></section></div>`;
  $('#message').insertAdjacentHTML('afterend',`<details id="diagnostics"><summary>Supabase 연결 진단</summary><p class="message">연결 주소: ${esc(api.c.url)}</p><button id="checkConnection" type="button" class="secondary full">연결 확인 (비밀번호 불필요)</button><div id="diagnosticResult" class="message" role="status" hidden></div></details>`);
  $('#checkConnection').onclick=async()=>{
@@ -36,27 +37,70 @@ async function enter(){
  const {data}=await api.rows('profiles','select=*&id=eq.'+encodeURIComponent(api.session.user.id));me=data[0];
  if(!me?.active){await api.logout().catch(()=>{});login('계정 활성화 대기 중입니다. 관리자에게 사용자 등록을 요청하세요.');return;}
  try{context=await new MesService(api).context();if(context?.profile?.id!==me.id||!['4.0.0','4.1.0','4.2.0'].includes(context?.version))throw Error('v4 데이터베이스 응답을 확인하지 못했습니다.');}catch(e){context={profile:me,capabilities:[],schemaError:e.message};}
- mes=new MesController(api,context,(target,detail)=>{tab=target;shell();if(detail){mes.page=target;mes.detail=detail;}load().catch(fail);});
- tab=context.version==='4.2.0'?(pageAllowed(context,'touchWork')&&!pageAllowed(context,'orders')?'touchWork':Object.keys(labels).find(k=>pageAllowed(context,k))||'noAccess'):'home';shell();await load();if(context.version!=='4.2.0')message('v4.2 DB 확장 전입니다. 기존 config.js와 자료를 보존한 뒤 database/08_upgrade_v4_2.sql 적용 여부를 확인하세요.',true);
+ mes=new MesController(api,context,(target,detail)=>{navigate(target,detail).catch(fail);});
+ tab=context.version==='4.2.0'?firstPage(context):'home';shell({resetPage:true});await load();if(context.version!=='4.2.0')message('v4.2 DB 확장 전입니다. 기존 config.js와 자료를 보존한 뒤 database/08_upgrade_v4_2.sql 적용 여부를 확인하세요.',true);
 }
 const menuKey=()=>`dnm-menu:${me?.id||'none'}`;
-function menuState(){try{return JSON.parse(localStorage.getItem(menuKey())||'{}');}catch{return{};}}
+function menuState(){try{return restoreMenuState(JSON.parse(localStorage.getItem(menuKey())||'{}'));}catch{return{};}}
 function saveMenu(state){try{localStorage.setItem(menuKey(),JSON.stringify(state));}catch{}}
 function permittedTabs(){return Object.keys(labels).filter(k=>context?.version==='4.2.0'?pageAllowed(context,k):me.role==='admin'&&legacyTabs.includes(k));}
-function navMarkup(tabs){const saved=menuState();return GROUPS.map(([name,keys],i)=>{const visible=keys.filter(k=>tabs.includes(k));if(!visible.length)return '';const open=saved[name]??visible.includes(tab);return `<details class="nav-section" data-navgroup="${i}" ${open?'open':''}><summary>${name}<span class="nav-count">${visible.length}</span></summary><div class="nav-items">${visible.map(k=>`<button data-tab="${k}" class="${tab===k?'selected':''}">${labels[k]}</button>`).join('')}</div></details>`;}).join('');}
+let sidebarScroll=0,navigationBusy=false;
+
 async function refreshContext(){const c=await new MesService(api).context();if(!c?.profile?.active||c.profile.id!==me.id){await api.logout();login('권한 또는 계정 상태가 변경되었습니다. 다시 로그인하세요.');return false;}context=c;me=c.profile;mes.setContext(c);return true;}
-async function navigate(target){if(mes.loadingImport){message('자료묶음 처리 중에는 화면을 유지하세요.',true);return;}if(!await refreshContext())return;tab=target;page=1;query='';status='active';if(context.version==='4.2.0'&&!pageAllowed(context,tab))tab=permittedTabs()[0]||'noAccess';shell();await load();}
-function shell(){
+async function navigate(target,detail){
+ if(mes.loadingImport){message('자료묶음 처리 중에는 화면을 유지하세요.',true);return;}
+ if(navigationBusy)return;
+ navigationBusy=true;
+ try{
+  if(!await refreshContext())return;
+  const oldTab=tab;
+  tab=target;page=1;query='';status='active';
+  if(context.version==='4.2.0'&&!pageAllowed(context,tab))tab=firstPage(context);
+  document.body.classList.remove('tv-mode');
+  shell({resetPage:true});
+  // Internal links (e.g. an order card) use the same navigation and ACL checks.
+  if(detail&&tab===target){mes.page=target;mes.search='';mes.pageNo=1;mes.detail=detail;}
+  else if(oldTab===target)mes.detail=null;
+  await load();
+ }finally{navigationBusy=false;}
+}
+function setMobileMenu(open){
+ const shell=document.querySelector('.app-shell'),nav=$('#sideNav'),button=$('#mobileNav'),main=document.querySelector('.main-pane'),veil=$('#navBackdrop');
+ if(!shell||!nav||!button)return;
+ shell.classList.toggle('nav-open',open);document.body.classList.toggle('nav-drawer-open',open);
+ button.setAttribute('aria-expanded',String(open));if(veil)veil.hidden=!open;
+ if(main)main.inert=open;
+ if(open)requestAnimationFrame(()=>{keepSelectedVisible($('#sideMenu'));const active=nav.querySelector('[aria-current="page"]')||$('#closeNav');active?.focus({preventScroll:true});});
+ else button.focus({preventScroll:true});
+}
+function shell({resetPage=false}={}){
+ const oldMenu=$('#sideMenu');if(oldMenu)sidebarScroll=oldMenu.scrollTop;
  const tabs=permittedTabs();
- $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar" id="sideNav"><div><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><small>구매·생산 통합관리</small></div><div class="nav-controls"><button type="button" id="expandNav">전체 펼치기</button><button type="button" id="collapseNav">전체 접기</button></div><nav aria-label="업무 메뉴">${navMarkup(tabs)}</nav><footer>${VERSION}<br>공동 데이터 · Supabase<br>Ollama 연결 불필요</footer></aside><div class="main-pane"><header class="topbar"><button type="button" id="mobileNav" class="secondary mobile-nav" aria-expanded="false" aria-controls="sideNav">☰ 메뉴</button><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><h1 id="title">${labels[tab]||'사용권한 확인'}</h1><span class="muted">허용된 메뉴만 표시 · 등록/수정 권한 별도</span></div><div class="actions"><button id="vhelp" class="secondary">❔ 사용방법</button><button id="reload" class="secondary">새로고침</button></div></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
+ document.body.classList.remove('nav-drawer-open');
+ $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar" id="sideNav" aria-label="디엔엠 업무 탐색"><div class="sidebar-brand"><div><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><small>구매·생산 통합관리</small></div><button type="button" id="closeNav" class="nav-close" aria-label="업무 메뉴 닫기">✕</button></div><nav id="sideMenu" aria-label="업무 메뉴">${renderNavigation(tabs,tab,menuState())}</nav><footer>${VERSION}<br>공동 데이터 · Supabase<br>Ollama 연결 불필요</footer></aside><button id="navBackdrop" type="button" class="nav-backdrop" aria-label="업무 메뉴 닫기" tabindex="-1" hidden></button><div class="main-pane"><header class="topbar"><button type="button" id="mobileNav" class="secondary mobile-nav" aria-expanded="false" aria-controls="sideNav">☰ 메뉴</button><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><div class="page-path" aria-label="현재 위치">${breadcrumbMarkup(tab)}</div><h1 id="title" tabindex="-1">${labels[tab]||'사용권한 확인'}</h1><span class="muted">허용된 메뉴만 표시 · 등록/수정 권한 별도</span></div><div class="actions"><button id="vhelp" class="secondary">❔ 사용방법</button><button id="reload" class="secondary">새로고침</button></div></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
  all('[data-tab]').forEach(b=>b.onclick=guarded(()=>navigate(b.dataset.tab)));
- for(const d of all('[data-navgroup]'))d.addEventListener('toggle',()=>{const state=menuState();state[GROUPS[Number(d.dataset.navgroup)][0]]=d.open;saveMenu(state);});
- for(const [id,open] of [['expandNav',true],['collapseNav',false]])$('#'+id).onclick=()=>{const state=menuState();for(const d of all('[data-navgroup]')){d.open=open;state[GROUPS[Number(d.dataset.navgroup)][0]]=open;}saveMenu(state);};
- $('#mobileNav').onclick=()=>{const show=document.querySelector('.app-shell').classList.toggle('nav-open');$('#mobileNav').setAttribute('aria-expanded',String(show));};
- $('#vhelp').onclick=()=>{if(!legacyTabs.includes(tab))mes.help();else helpModal(labels[tab]+' 사용방법','<p>조회·등록·수정은 사용자별로 분리됩니다. 계정은 Supabase Authentication에서 생성한 뒤 사용자 관리에서 활성화하세요.</p><p>관리자가 “사용자별 권한”에서 메뉴별 조회·등록·수정과 본인/전체 범위를 지정합니다. 전체 펼치기는 허용된 메뉴만 펼칩니다.</p>');};
+ for(const d of all('[data-navgroup]'))d.addEventListener('toggle',()=>{const state=menuState();state[d.dataset.navgroup]=d.open;saveMenu(state);});
+ const menu=$('#sideMenu');menu.scrollTop=sidebarScroll;
+ menu.addEventListener('scroll',()=>{sidebarScroll=menu.scrollTop;},{passive:true});
+ if(resetPage)window.scrollTo({top:0,left:0,behavior:'instant'});
+ requestAnimationFrame(()=>{if(menu.isConnected){keepSelectedVisible(menu);sidebarScroll=menu.scrollTop;}});
+ $('#mobileNav').onclick=()=>setMobileMenu(!document.querySelector('.app-shell').classList.contains('nav-open'));
+ $('#closeNav').onclick=$('#navBackdrop').onclick=()=>setMobileMenu(false);
+ $('#sideNav').onkeydown=e=>{
+  if(!document.querySelector('.app-shell').classList.contains('nav-open'))return;
+  if(e.key==='Escape'){e.preventDefault();setMobileMenu(false);return;}
+  if(e.key==='Tab'){
+   const focusables=all('button:not([disabled]),summary', $('#sideNav')).filter(x=>x.getClientRects().length);
+   const first=focusables[0],last=focusables.at(-1);
+   if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
+   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
+  }
+ };
+ $('#vhelp').onclick=()=>{if(!legacyTabs.includes(tab))mes.help();else helpModal(labels[tab]+' 사용방법','<p>조회·등록·수정은 사용자별로 분리됩니다. 계정은 Supabase Authentication에서 생성한 뒤 사용자 관리에서 활성화하세요.</p><p>그룹 제목을 눌러 하위 메뉴를 펼치거나 접습니다. 선택된 메뉴는 왼쪽에서 강조되며 상단 현재 위치에 같은 화면명이 표시됩니다.</p>');};
  $('#reload').onclick=guarded(()=>navigate(tab));$('#logout').onclick=guarded(async()=>{if(mes.loadingImport)throw Error('일괄등록 처리 종료 후 로그아웃하세요.');try{await api.logout();}finally{login();}});
  $('#password').onclick=()=>openForm('비밀번호 변경',field('current','현재 비밀번호','','password','required autocomplete="current-password"')+field('next','새 비밀번호 (12자 이상)','','password','required minlength="12" autocomplete="new-password"')+field('repeat','새 비밀번호 확인','','password','required minlength="12" autocomplete="new-password"'),async f=>{if(f.next!==f.repeat)throw Error('새 비밀번호가 일치하지 않습니다.');if(f.current===f.next)throw Error('기존과 다른 비밀번호를 사용하세요.');await api.login(me.email,f.current);await api.request('/auth/v1/user',{method:'PUT',body:{password:f.next}});await api.logout();login('비밀번호가 변경됐습니다. 새 비밀번호로 로그인하세요.');});
 }
+
 const field=(name,label,value='',type='text',attrs='')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
 const empty='<div class="empty">등록된 자료가 없습니다.</div>';
 function grid(headers,rows){return rows.length?`<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td class="wrap">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:empty;}
@@ -108,5 +152,11 @@ function edit(kind,r){
 }
 function access(r){openForm('사용자 활성화·권한',`<p>${esc(r.email)}</p>${field('name','성명',r.display_name,'text','required maxlength="100"')}<label>역할<select name="role">${Object.entries(roleLabel).map(([v,t])=>`<option value="${v}" ${v===r.role?'selected':''}>${t}</option>`).join('')}</select></label><label class="check"><input name="active" type="checkbox" ${r.active?'checked':''}>사용 허용</label><p class="muted">관리자: 사용자 관리와 모든 자료 수정<br>담당자: 사용자별 메뉴·조회·등록·수정 권한 별도 지정 필요<br>조회자: 허용된 메뉴의 조회만 가능</p>`,f=>api.access({p_id:r.id,p_version:r.version,p_name:f.name,p_role:f.role,p_active:f.active==='on'}));}
 try{api=new PortalApi(settings(SUPABASE_URL,SUPABASE_PUBLIC_KEY));if(api.session)await enter();else login();}catch(e){if(api)login(e.message);else{$('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><h1>클라우드 업무포털</h1><p>내부 서버 없이 PC와 휴대폰을 연결합니다.</p></section><section class="loginbox"><div><span class="tag off">연결 설정 필요</span><h2>두 값을 입력하면 시작할 수 있습니다.</h2><p>${esc(e.message)}</p><ol><li>Supabase DB 초기 설정</li><li>config.js의 URL·공개용 키 입력</li><li>Netlify에 public 폴더 배포</li></ol><p>아직 DB에 연결되지 않았습니다. 로그인이나 저장이 된 것처럼 표시하지 않습니다.</p><a href="setup.html">실제 설치 순서 열기</a></div></section></div>`;}}
-setInterval(()=>{if(!me||mes?.loadingImport||!['dashboard','orders','routing','touchWork','voiceWork','worklogs','purchase','receipts','settlement','quality'].includes(tab)||document.hidden||($('#editor').open||document.querySelector('#v4dialog')?.open)||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;(async()=>{const before=JSON.stringify(context?.permissions);if(!await refreshContext())return;if(before!==JSON.stringify(context?.permissions)){if(!pageAllowed(context,tab))tab=permittedTabs()[0]||'noAccess';shell();}await load();})().catch(fail);},15000);
+setInterval(()=>{if(!me||navigationBusy||mes?.loadingImport||!['dashboard','orders','routing','instructions','touchWork','voiceWork','worklogs','purchase','receipts','settlement','quality'].includes(tab)||document.hidden||($('#editor').open||document.querySelector('#v4dialog')?.open)||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;(async()=>{const contextSignature=c=>JSON.stringify([c?.profile?.role,c?.permissions,c?.capabilities]);const before=contextSignature(context);if(!await refreshContext())return;if(before!==contextSignature(context)){if(!pageAllowed(context,tab))tab=firstPage(context);shell();}await load();})().catch(fail);},15000);
 window.addEventListener('beforeunload',e=>{if(mes?.loadingImport){e.preventDefault();e.returnValue='';}});
+
+window.addEventListener('resize',()=>{
+ if(!me)return;
+ if(window.matchMedia('(min-width:901px)').matches&&document.querySelector('.app-shell.nav-open'))setMobileMenu(false);
+ const menu=$('#sideMenu');if(menu)keepSelectedVisible(menu);
+},{passive:true});

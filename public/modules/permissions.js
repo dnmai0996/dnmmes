@@ -1,7 +1,17 @@
 // v4.2 UI capabilities mirror the database ACL. Never use this file as the only authorization check.
 export const MODULES={dashboard:'작업진척 대시보드',orders:'고객수주·원본',routing:'Routing·작업지시',worklogs:'본인작업·작업일보',purchase:'구매요청',receipts:'발주·입고·반품',settlement:'정산',quality:'품질·출하',documents:'품질문서',products:'제품',materials:'자재',employees:'작업자',processes:'공정',equipment:'설비',instruments:'계측기',customers:'매출처',suppliers:'매입처',templates:'제품 Routing',assignments:'설비·작업자 연결',catalog:'공구·공급업체',notes:'공유메모',archives:'원본 Routing 이력'};
-export const GROUPS=[['현장·생산',['dashboard','touchWork','voiceWork','worklogs','orders','sourceOrders','routing','routingSetup','workCards']],['구매·품질',['purchase','receipts','settlement','quality','documents']],['기준정보',['products','materials','employees','processes','equipment','instruments','customers','suppliers','templates','routeCandidates','assignments','catalog']],['초기구축·운영',['seedData','workforceSetup','sourceReview','archives','notes','profiles','access','audit','backup','home']]];
-export const PAGE_MODULE={sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
+// Dashboard is a standalone entry; group visibility still uses the existing database ACL.
+export const TOP_PAGES=['dashboard'];
+export const GROUPS=[
+ ['수주관리',['orders','sourceOrders','templates','routeCandidates','routingSetup','routing']],
+ ['생산관리',['instructions','workCards','touchWork','voiceWork','worklogs']],
+ ['구매관리',['purchase','receipts','settlement']],
+ ['품질관리',['quality','documents']],
+ ['설비·계측관리',['equipment','instruments']],
+ ['기준정보',['products','materials','employees','processes','customers','suppliers','assignments','catalog']],
+ ['초기구축·운영',['seedData','workforceSetup','sourceReview','archives','notes','profiles','access','audit','backup','home']]
+];
+export const PAGE_MODULE={instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
 export const ADMIN_PAGES=new Set(['seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
 export function permit(ctx,module,action='read'){
  if(!ctx?.profile?.active)return false;if(ctx.profile.role==='admin')return true;
@@ -9,7 +19,7 @@ export function permit(ctx,module,action='read'){
  const p=ctx.permissions?.[module];return !!(p?.read&&(action==='read'||p[action]));
 }
 export function pageAllowed(ctx,page){return ADMIN_PAGES.has(page)?ctx?.profile?.active&&ctx.profile.role==='admin':permit(ctx,PAGE_MODULE[page]||page);}
-export function navGroups(ctx){return GROUPS.map(([title,pages])=>({title,pages:pages.filter(p=>pageAllowed(ctx,p))})).filter(g=>g.pages.length);}
+export function navGroups(ctx){return [...TOP_PAGES.filter(p=>pageAllowed(ctx,p)).map(p=>({title:'대시보드',pages:[p],standalone:true})),...GROUPS.map(([title,pages])=>({title,pages:pages.filter(p=>pageAllowed(ctx,p))})).filter(g=>g.pages.length)];}
 export function permissionPreset(name){
  const acl=Object.fromEntries(Object.keys(MODULES).map(m=>[m,{read:false,create:false,update:false,scope:'all'}]));
  const set=(m,write=false,scope='all')=>{acl[m]={read:true,create:write,update:write,scope};};
