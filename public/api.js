@@ -12,8 +12,14 @@ function responseFailure(path, method, code){
 }
 
 export class PortalApi{
- constructor(config,{storage=sessionStorage,fetcher=fetch}={}){
-  this.c=config;this.storage=storage;this.fetcher=fetcher;this.key='dnm-portal-session:'+config.url;
+ // DNM v4.0.2: browser native fetch receiver binding fix.
+ constructor(config,{storage=sessionStorage,fetcher=null}={}){
+  this.c=config;
+  this.storage=storage;
+  // Never call detached native fetch as an instance method (Illegal invocation).
+  // Keep injected fetcher support for existing unit tests and mocks.
+  this.fetcher=fetcher ? (...args)=>fetcher(...args) : (...args)=>globalThis.fetch(...args);
+  this.key='dnm-portal-session:'+config.url;
   try{this.session=JSON.parse(storage.getItem(this.key));}catch{this.session=null;}
  }
  keep(s){
