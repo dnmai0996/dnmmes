@@ -1,0 +1,296 @@
+
+> dnm-cloud-mes@4.0.0 test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: a write requires authentication before any network call
+ok 1 - a write requires authentication before any network call
+  ---
+  duration_ms: 1.35075
+  type: 'test'
+  ...
+# Subtest: read sends public key plus user token and parses shared total
+ok 2 - read sends public key plus user token and parses shared total
+  ---
+  duration_ms: 22.066528
+  type: 'test'
+  ...
+# Subtest: edit is conditional on record version and does not overwrite a conflict
+ok 3 - edit is conditional on record version and does not overwrite a conflict
+  ---
+  duration_ms: 0.84764
+  type: 'test'
+  ...
+# Subtest: duplicate and permission errors are visible to the user
+ok 4 - duplicate and permission errors are visible to the user
+  ---
+  duration_ms: 1.080392
+  type: 'test'
+  ...
+# Subtest: ambiguous failed write is not silently retried or reported as saved
+ok 5 - ambiguous failed write is not silently retried or reported as saved
+  ---
+  duration_ms: 0.442889
+  type: 'test'
+  ...
+# Subtest: truncated response after write is also treated as an uncertain result
+ok 6 - truncated response after write is also treated as an uncertain result
+  ---
+  duration_ms: 0.693908
+  type: 'test'
+  ...
+# Subtest: expired session refreshes once for simultaneous reads
+ok 7 - expired session refreshes once for simultaneous reads
+  ---
+  duration_ms: 11.311545
+  type: 'test'
+  ...
+# Subtest: 401 triggers one token refresh and a single retry
+ok 8 - 401 triggers one token refresh and a single retry
+  ---
+  duration_ms: 1.943686
+  type: 'test'
+  ...
+# Subtest: failed refresh clears session; logout clears session even on network failure
+ok 9 - failed refresh clears session; logout clears session even on network failure
+  ---
+  duration_ms: 0.811736
+  type: 'test'
+  ...
+# Subtest: failed login connection never displays data-save instructions or echoes credentials
+ok 10 - failed login connection never displays data-save instructions or echoes credentials
+  ---
+  duration_ms: 0.680378
+  type: 'test'
+  ...
+# Subtest: login timeout has an explicit code without implying a database write
+ok 11 - login timeout has an explicit code without implying a database write
+  ---
+  duration_ms: 0.392132
+  type: 'test'
+  ...
+# Subtest: connection check sends only public key, no password or user authorization
+ok 12 - connection check sends only public key, no password or user authorization
+  ---
+  duration_ms: 0.394506
+  type: 'test'
+  ...
+# Subtest: diagnostic reports email authentication disabled separately from reachability
+ok 13 - diagnostic reports email authentication disabled separately from reachability
+  ---
+  duration_ms: 0.333964
+  type: 'test'
+  ...
+# Subtest: diagnostic rejects invalid public key with status, without blaming the password
+ok 14 - diagnostic rejects invalid public key with status, without blaming the password
+  ---
+  duration_ms: 0.297699
+  type: 'test'
+  ...
+# Subtest: diagnostic preserves HTTP status even when a proxy returns HTML
+ok 15 - diagnostic preserves HTTP status even when a proxy returns HTML
+  ---
+  duration_ms: 0.317169
+  type: 'test'
+  ...
+# Subtest: malformed settings and login responses cannot produce false success
+ok 16 - malformed settings and login responses cannot produce false success
+  ---
+  duration_ms: 0.593797
+  type: 'test'
+  ...
+# Subtest: blank configuration fails visibly; HTTPS project URL is required
+ok 17 - blank configuration fails visibly; HTTPS project URL is required
+  ---
+  duration_ms: 1.136236
+  type: 'test'
+  ...
+# Subtest: browser accepts public keys and rejects privileged keys
+ok 18 - browser accepts public keys and rejects privileged keys
+  ---
+  duration_ms: 1.131119
+  type: 'test'
+  ...
+# Subtest: copied outer whitespace is removed; invalid key characters are rejected before fetch
+ok 19 - copied outer whitespace is removed; invalid key characters are rejected before fetch
+  ---
+  duration_ms: 0.379102
+  type: 'test'
+  ...
+# Subtest: required and oversized data cannot reach the write call
+ok 20 - required and oversized data cannot reach the write call
+  ---
+  duration_ms: 0.720117
+  type: 'test'
+  ...
+# Subtest: pagination and search preserve quoted input as one filter value
+ok 21 - pagination and search preserve quoted input as one filter value
+  ---
+  duration_ms: 0.410721
+  type: 'test'
+  ...
+# Subtest: untrusted content is escaped before HTML rendering
+ok 22 - untrusted content is escaped before HTML rendering
+  ---
+  duration_ms: 0.169987
+  type: 'test'
+  ...
+# Subtest: integer quantity checks prevent negatives, fractions, empty and unsafe values
+ok 23 - integer quantity checks prevent negatives, fractions, empty and unsafe values
+  ---
+  duration_ms: 1.630172
+  type: 'test'
+  ...
+# Subtest: money precision accepts exactly at most two decimals
+ok 24 - money precision accepts exactly at most two decimals
+  ---
+  duration_ms: 0.260293
+  type: 'test'
+  ...
+# Subtest: valid dates and Excel serial 1900/1904 schemes are explicit
+ok 25 - valid dates and Excel serial 1900/1904 schemes are explicit
+  ---
+  duration_ms: 0.730984
+  type: 'test'
+  ...
+# Subtest: full shift is 460 minutes (7:40), not 7.40 hours
+ok 26 - full shift is 460 minutes (7:40), not 7.40 hours
+  ---
+  duration_ms: 0.173973
+  type: 'test'
+  ...
+# Subtest: break overlap and overtime use exact integer minutes
+ok 27 - break overlap and overtime use exact integer minutes
+  ---
+  duration_ms: 0.230458
+  type: 'test'
+  ...
+# Subtest: defect quantities cannot exceed total; zero quantities remain valid
+ok 28 - defect quantities cannot exceed total; zero quantities remain valid
+  ---
+  duration_ms: 0.613917
+  type: 'test'
+  ...
+# Subtest: voice draft requires explicit numerals and never invents zero defects
+ok 29 - voice draft requires explicit numerals and never invents zero defects
+  ---
+  duration_ms: 0.659976
+  type: 'test'
+  ...
+# Subtest: CSV values are escaped and formula prefixes neutralized
+ok 30 - CSV values are escaped and formula prefixes neutralized
+  ---
+  duration_ms: 0.963826
+  type: 'test'
+  ...
+# Subtest: inactive and viewer accounts do not gain work rights from capabilities
+ok 31 - inactive and viewer accounts do not gain work rights from capabilities
+  ---
+  duration_ms: 0.554487
+  type: 'test'
+  ...
+# Subtest: dashboard only counts final accepted quantity, not intermediate process sums
+ok 32 - dashboard only counts final accepted quantity, not intermediate process sums
+  ---
+  duration_ms: 0.410871
+  type: 'test'
+  ...
+# Subtest: column positions support duplicate labels A..CD
+ok 33 - column positions support duplicate labels A..CD
+  ---
+  duration_ms: 0.195455
+  type: 'test'
+  ...
+# Subtest: XML entities are decoded without HTML execution
+ok 34 - XML entities are decoded without HTML execution
+  ---
+  duration_ms: 0.255576
+  type: 'test'
+  ...
+# Subtest: order import does not replace missing PO line with PR/contract item
+ok 35 - order import does not replace missing PO line with PR/contract item
+  ---
+  duration_ms: 0.808671
+  type: 'test'
+  ...
+# Subtest: bad order quantities and repeated production no block import
+ok 36 - bad order quantities and repeated production no block import
+  ---
+  duration_ms: 1.068463
+  type: 'test'
+  ...
+# Subtest: catalogue dedup keeps all source rows and never invents prices or units
+ok 37 - catalogue dedup keeps all source rows and never invents prices or units
+  ---
+  duration_ms: 0.715731
+  type: 'test'
+  ...
+# Subtest: server command passes idempotency UUID unchanged for retries
+ok 38 - server command passes idempotency UUID unchanged for retries
+  ---
+  duration_ms: 0.389057
+  type: 'test'
+  ...
+# Subtest: malformed command responses remain uncertain, never success
+ok 39 - malformed command responses remain uncertain, never success
+  ---
+  duration_ms: 0.31174
+  type: 'test'
+  ...
+# Subtest: server 5xx becomes uncertain for safe keyed retry
+ok 40 - server 5xx becomes uncertain for safe keyed retry
+  ---
+  duration_ms: 0.287284
+  type: 'test'
+  ...
+# Subtest: migration has transaction and no destructive table/auth deletion
+ok 41 - migration has transaction and no destructive table/auth deletion
+  ---
+  duration_ms: 1.294045
+  type: 'test'
+  ...
+# Subtest: v4 business records cannot be directly mutated by authenticated browser
+ok 42 - v4 business records cannot be directly mutated by authenticated browser
+  ---
+  duration_ms: 0.287264
+  type: 'test'
+  ...
+# Subtest: idempotent commands check request payload hash and serialize transitions
+ok 43 - idempotent commands check request payload hash and serialize transitions
+  ---
+  duration_ms: 0.241946
+  type: 'test'
+  ...
+# Subtest: approval guards self approval, current step, mandatory next step and delegation expiry
+ok 44 - approval guards self approval, current step, mandatory next step and delegation expiry
+  ---
+  duration_ms: 0.249096
+  type: 'test'
+  ...
+# Subtest: all implemented frontend workflow actions have server handlers
+ok 45 - all implemented frontend workflow actions have server handlers
+  ---
+  duration_ms: 0.418091
+  type: 'test'
+  ...
+# Subtest: unsupported browser keeps typing available and disables only voice
+ok 46 - unsupported browser keeps typing available and disables only voice
+  ---
+  duration_ms: 1.036215
+  type: 'test'
+  ...
+# Subtest: voice starts on click only, adds text without saving, and can abort
+ok 47 - voice starts on click only, adds text without saving, and can abort
+  ---
+  duration_ms: 0.256257
+  type: 'test'
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 150.606498

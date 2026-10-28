@@ -2,17 +2,23 @@ import {SUPABASE_URL,SUPABASE_PUBLIC_KEY} from './config.js';
 import {VERSION,esc,settings,listQuery,cleanRecord} from './core.js';
 import {PortalApi} from './api.js';
 import {voiceFor} from './speech.js';
+import {MesController} from './modules/mes.js';
+import {MesService} from './modules/service.js';
+import {can} from './modules/domain.js';
+import {modal as helpModal} from './modules/ui.js';
 const $=s=>document.querySelector(s),all=s=>[...document.querySelectorAll(s)];
-const labels={home:'업무 현황',products:'품목 기준정보',partners:'거래처',notes:'공유메모',profiles:'사용자 관리',audit:'변경 이력'};
+const labels={dashboard:'작업진척 대시보드',orders:'고객 수주',sourceOrders:'수주 원본 82열',routing:'Routing · 작업지시',work:'나의 작업 · 음성',worklogs:'작업일보',purchase:'구매요청 · 결재',receipts:'발주 · 입고 · 반품',settlement:'정산',quality:'품질 · 출하',documents:'품질문서 대장',products:'품목 기준정보',partners:'거래처',equipment:'설비대장',instruments:'계측기대장',employees:'작업자',assignments:'설비·작업자 연결',templates:'공정 템플릿',catalog:'공구·공급업체',notes:'공유메모',profiles:'사용자 관리',access:'업무권한 · 전결',audit:'변경 이력',backup:'백업 · 운영점검',home:'공통관리 현황'};
+const legacyTabs=['home','products','partners','notes','profiles','audit'];
+let mes,context;
 const roleLabel={admin:'관리자',member:'담당자',viewer:'조회자'};
 let api,me,tab='home',page=1,query='',status='active',generation=0,stopVoice=()=>{};
 const clock=v=>new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
 function message(text,error=false){const box=$('#editor').open?$('#dialogMessage'):$('#message');if(box){box.hidden=false;box.className='message'+(error?' error':'')+($('#editor').open?' dialog-message':'');box.textContent=text;}}
-function fail(e){message(e.message,true);if(api&&!api.session)login(e.message);}
+function fail(e){const text=e?.message||'처리 결과를 확인하지 못했습니다. 다시 조회하세요.';message(text,true);if(api&&!api.session)login(text);}
 function guarded(fn){return async()=>{try{await fn();}catch(e){fail(e);}};}
 function login(msg=''){
- generation++;me=null;stopVoice();$('#editor').close();
- $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand">DNM</div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>품목과 거래처를 함께 관리하고,<br>메모를 팀과 공유하세요.</p></section><section class="loginbox"><div><span class="tag">공통관리판 · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">회사에서 등록한 이메일과 비밀번호를 사용하세요.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p><small>Ollama 미연결 · 기본 업무 사용 가능</small></div></section></div>`;
+ generation++;me=null;document.body.classList.remove('tv-mode');document.querySelector('#v4dialog')?.close();stopVoice();$('#editor').close();
+ $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>수주에서 생산·품질까지,<br>현장의 기록을 한 곳에서 연결합니다.</p></section><section class="loginbox"><div><span class="tag">클라우드 MES · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">회사에서 등록한 이메일과 비밀번호를 사용하세요.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p><small>Ollama 미연결 · 기본 업무 사용 가능</small></div></section></div>`;
  $('#message').insertAdjacentHTML('afterend',`<details id="diagnostics"><summary>Supabase 연결 진단</summary><p class="message">연결 주소: ${esc(api.c.url)}</p><button id="checkConnection" type="button" class="secondary full">연결 확인 (비밀번호 불필요)</button><div id="diagnosticResult" class="message" role="status" hidden></div></details>`);
  $('#checkConnection').onclick=async()=>{
   const button=$('#checkConnection'),box=$('#diagnosticResult');button.disabled=true;box.hidden=false;box.className='message';box.textContent='인증 서비스 연결을 확인하고 있습니다…';
@@ -28,12 +34,15 @@ function login(msg=''){
 async function enter(){
  const {data}=await api.rows('profiles','select=*&id=eq.'+encodeURIComponent(api.session.user.id));me=data[0];
  if(!me?.active){await api.logout().catch(()=>{});login('계정 활성화 대기 중입니다. 관리자에게 사용자 등록을 요청하세요.');return;}
- tab='home';shell();await load();
+ try{context=await new MesService(api).context();if(context?.profile?.id!==me.id||context?.version!=='4.0.0')throw Error('v4 데이터베이스 응답을 확인하지 못했습니다.');}catch(e){context={profile:me,capabilities:[],schemaError:e.message};}
+ mes=new MesController(api,context,(target,detail)=>{tab=target;shell();if(detail){mes.page=target;mes.detail=detail;}load().catch(fail);});
+ tab=context?.version?'dashboard':'home';shell();await load();if(context.schemaError)message('기존 로그인·공통자료 기능은 유지됩니다. v4 DB 확장 연결을 확인하세요. database/04_upgrade_v4.sql 적용 및 같은 Supabase 프로젝트인지 확인하십시오. '+context.schemaError,true);
 }
 function shell(){
- const tabs=Object.keys(labels).filter(k=>me.role==='admin'||!['profiles','audit'].includes(k));
- $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar"><div><div class="brand">DNM</div><small>업무포털 · 공통관리</small></div><nav aria-label="업무 메뉴">${tabs.map(k=>`<button data-tab="${k}" class="${tab===k?'selected':''}">${labels[k]}</button>`).join('')}</nav><footer>${VERSION}<br>공동 데이터 · Supabase<br>Ollama 연결 불필요</footer></aside><div><header class="topbar"><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><h1 id="title">${labels[tab]}</h1><span class="muted">PC와 휴대폰에서 같은 자료를 확인합니다.</span></div><button id="reload" class="secondary">새로고침</button></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
+ const tabs=Object.keys(labels).filter(k=>{if(!context?.version&&!legacyTabs.includes(k))return false;if(['profiles','audit','access','backup'].includes(k))return me.role==='admin';if(k==='sourceOrders')return can(context,'production')||can(context,'master');if(['settlement','receipts'].includes(k))return can(context,'purchase');if(k==='documents')return can(context,'quality')||can(context,'production')||can(context,'master');return true;});
+ $('#app').innerHTML=`<div class="app-shell"><aside class="sidebar"><div><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><small>구매·생산 통합관리</small></div><nav aria-label="업무 메뉴">${tabs.map(k=>`<button data-tab="${k}" class="${tab===k?'selected':''}">${labels[k]}</button>`).join('')}</nav><footer>${VERSION}<br>공동 데이터 · Supabase<br>Ollama 연결 불필요</footer></aside><div><header class="topbar"><span id="connection" role="status">연결 확인 중</span><div class="who">${esc(me.display_name||me.email)} · ${roleLabel[me.role]}</div><div><button id="password" class="secondary">비밀번호</button> <button id="logout" class="quiet">로그아웃</button></div></header><main class="workspace"><div class="heading"><div><h1 id="title">${labels[tab]}</h1><span class="muted">PC와 휴대폰에서 같은 자료를 확인합니다.</span></div><div class="actions"><button id="vhelp" class="secondary">❔ 사용방법</button><button id="reload" class="secondary">새로고침</button></div></div><div id="message" class="message" role="status" hidden></div><div id="content"></div></main></div></div>`;
  all('[data-tab]').forEach(b=>b.onclick=guarded(async()=>{tab=b.dataset.tab;page=1;query='';status='active';shell();await load();}));
+ $('#vhelp').onclick=()=>{if(!legacyTabs.includes(tab))mes.help();else helpModal(labels[tab]+' 사용방법', '<p>자료를 검색하고 신규 등록 또는 수정을 선택하세요. 변경 후 저장 결과를 확인하십시오.</p><p>사용자 계정은 Supabase Authentication에서 생성한 후 관리자 화면에서 활성화합니다. 별도의 v4 업무권한은 업무권한·전결 화면에서 지정합니다.</p>');};
  $('#reload').onclick=guarded(load);$('#logout').onclick=guarded(async()=>{try{await api.logout();}finally{login();}});
  $('#password').onclick=()=>openForm('비밀번호 변경',field('current','현재 비밀번호','','password','required autocomplete="current-password"')+field('next','새 비밀번호 (12자 이상)','','password','required minlength="12" autocomplete="new-password"')+field('repeat','새 비밀번호 확인','','password','required minlength="12" autocomplete="new-password"'),async f=>{if(f.next!==f.repeat)throw Error('새 비밀번호가 일치하지 않습니다.');if(f.current===f.next)throw Error('기존과 다른 비밀번호를 사용하세요.');await api.login(me.email,f.current);await api.request('/auth/v1/user',{method:'PUT',body:{password:f.next}});await api.logout();login('비밀번호가 변경됐습니다. 새 비밀번호로 로그인하세요.');});
 }
@@ -44,7 +53,7 @@ function editable(){return me.role!=='viewer';}
 async function load(){
  const ticket=++generation,kind=tab;$('#connection').textContent='조회 중…';
  try{
-  if(kind==='home'){
+  if(!legacyTabs.includes(kind)){await mes.load(kind);if(ticket!==generation)return;}else if(kind==='home'){
    const counts=await Promise.all(['products','partners','notes'].map(k=>api.rows(k,'select=id&limit=1')));if(ticket!==generation)return;
    $('#content').innerHTML=`<div class="metrics">${counts.map((r,i)=>`<div class="card metric"><span>${labels[['products','partners','notes'][i]]}</span><b>${r.total||0}</b></div>`).join('')}</div><div class="card"><h2>한 곳에 저장하고, 함께 확인합니다.</h2><p class="muted">자료는 연결된 Supabase에 저장됩니다. 다른 기기의 변경은 새로고침하거나 잠시 기다리면 확인할 수 있습니다.</p><div class="flow">품목 기준정보 · 제품코드, 품명, Project, 단위<br>거래처 · 고객사와 공급업체 연락정보<br>공유메모 · 음성 또는 직접 입력 후 확인·저장</div></div><div class="card"><h2>연결 상태</h2><p>공동 DB: 연결됨</p><p>Ollama: 미연결 — 이 앱의 기본 기능에는 필요하지 않습니다.</p><small>음성 입력은 지원 브라우저에서 사용합니다. 인식 결과는 저장 전에 수정할 수 있습니다.</small></div>`;
   }else{
@@ -60,6 +69,7 @@ async function load(){
    html+=`<div class="pagination"><button id="prev" class="secondary" ${page===1?'disabled':''}>이전</button><span>${page} / ${Math.max(1,Math.ceil(total/25))} · 총 ${total}건</span><button id="next" class="secondary" ${page*25>=total?'disabled':''}>다음</button></div>`;
    $('#content').innerHTML='<div class="card">'+html+'</div>';
    $('#search')?.addEventListener('submit',e=>{e.preventDefault();query=$('#searchText').value.trim();status=$('#status')?.value||'all';page=1;load().catch(fail);});
+   if(kind==='products'&&can(context,'master')){$('#new')?.insertAdjacentHTML('afterend','<button type="button" id="importProducts" class="secondary">품목 Excel 가져오기</button>');$('#importProducts')?.addEventListener('click',()=>mes.importForm('products'));}
    $('#new')?.addEventListener('click',()=>edit(kind));all('[data-edit]').forEach(b=>b.onclick=()=>edit(kind,rows.find(r=>r.id===b.dataset.edit)));
    all('[data-access]').forEach(b=>b.onclick=()=>access(rows.find(r=>r.id===b.dataset.access)));
    $('#prev').onclick=guarded(async()=>{page--;await load();});$('#next').onclick=guarded(async()=>{page++;await load();});
@@ -83,5 +93,5 @@ function edit(kind,r){
  openForm(labels[kind]+(r?' 수정':' 등록'),body,async f=>{await api.save(kind,cleanRecord(kind,f),r);},{voice:kind==='notes'});
 }
 function access(r){openForm('사용자 활성화·권한',`<p>${esc(r.email)}</p>${field('name','성명',r.display_name,'text','required maxlength="100"')}<label>역할<select name="role">${Object.entries(roleLabel).map(([v,t])=>`<option value="${v}" ${v===r.role?'selected':''}>${t}</option>`).join('')}</select></label><label class="check"><input name="active" type="checkbox" ${r.active?'checked':''}>사용 허용</label><p class="muted">관리자: 사용자 관리와 모든 자료 수정<br>담당자: 기준정보 등록·수정 및 본인 메모 수정<br>조회자: 조회만 가능</p>`,f=>api.access({p_id:r.id,p_version:r.version,p_name:f.name,p_role:f.role,p_active:f.active==='on'}));}
-try{api=new PortalApi(settings(SUPABASE_URL,SUPABASE_PUBLIC_KEY));if(api.session)await enter();else login();}catch(e){if(api)login(e.message);else{$('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand">DNM</div><h1>클라우드 업무포털</h1><p>내부 서버 없이 PC와 휴대폰을 연결합니다.</p></section><section class="loginbox"><div><span class="tag off">연결 설정 필요</span><h2>두 값을 입력하면 시작할 수 있습니다.</h2><p>${esc(e.message)}</p><ol><li>Supabase DB 초기 설정</li><li>config.js의 URL·공개용 키 입력</li><li>Netlify에 public 폴더 배포</li></ol><p>아직 DB에 연결되지 않았습니다. 로그인이나 저장이 된 것처럼 표시하지 않습니다.</p><a href="setup.html">실제 설치 순서 열기</a></div></section></div>`;}}
-setInterval(()=>{if(!me||document.hidden||$('#editor').open||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;load().catch(fail);},30000);
+try{api=new PortalApi(settings(SUPABASE_URL,SUPABASE_PUBLIC_KEY));if(api.session)await enter();else login();}catch(e){if(api)login(e.message);else{$('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand"><img src="assets/dnm-logo.png" alt="디엔엠"></div><h1>클라우드 업무포털</h1><p>내부 서버 없이 PC와 휴대폰을 연결합니다.</p></section><section class="loginbox"><div><span class="tag off">연결 설정 필요</span><h2>두 값을 입력하면 시작할 수 있습니다.</h2><p>${esc(e.message)}</p><ol><li>Supabase DB 초기 설정</li><li>config.js의 URL·공개용 키 입력</li><li>Netlify에 public 폴더 배포</li></ol><p>아직 DB에 연결되지 않았습니다. 로그인이나 저장이 된 것처럼 표시하지 않습니다.</p><a href="setup.html">실제 설치 순서 열기</a></div></section></div>`;}}
+setInterval(()=>{if(!me||!['dashboard','orders','routing','work','worklogs','purchase','receipts','settlement','quality'].includes(tab)||document.hidden||($('#editor').open||document.querySelector('#v4dialog')?.open)||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;load().catch(fail);},15000);

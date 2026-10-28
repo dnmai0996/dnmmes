@@ -1,0 +1,18 @@
+{
+  "version": "4.0.0",
+  "architecture": "Netlify static + Supabase Auth/PostgreSQL",
+  "source_base": "DNM_Cloud_Admin_v3.0 + DNM_Login_Patch_3.0.1",
+  "rc2_source_scope": "partial import/UI patch only; full original app absent",
+  "existing_config_required": true,
+  "migration": "database/04_upgrade_v4.sql",
+  "destructive_data_reset": false,
+  "tested_live_supabase": false,
+  "tested_live_postgresql": false,
+  "tested_netlify_deployment": false,
+  "tests": {
+    "javascript_syntax": 21,
+    "node_unit_and_static": 47,
+    "mock_api_browser_checks": 41
+  },
+  "private_data_embedded_in_public": false
+}

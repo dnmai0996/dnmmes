@@ -1,5 +1,13 @@
 node_modules/
-*.log
-.env*
+.env
+.env.*
+!.env.example
+private_import/
+private-import/
 backups/
-private/
+*.xlsx
+*.xlsm
+*.pdf
+*.pem
+*.key
+.DS_Store
