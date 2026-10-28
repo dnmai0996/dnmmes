@@ -11,3 +11,9 @@ backups/
 *.pem
 *.key
 .DS_Store
+
+# Private extracted business/employee sources must never be deployed
+*_PRIVATE*
+*.dnm.json
+__pycache__/
+*.pyc

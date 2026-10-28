@@ -1,0 +1,20 @@
+{
+  "checks": 12633,
+  "passed": 12633,
+  "failures": [],
+  "counts": {
+    "employee": 47,
+    "equipment": 66,
+    "instrument": 13,
+    "catalog": 1549,
+    "material_master": 1549,
+    "partners": 3,
+    "products": 579,
+    "part_detail": 579,
+    "route_candidate": 415,
+    "route_template": 367,
+    "process_master": 286,
+    "flow_reference": 2
+  },
+  "history": 2875
+}

@@ -28,7 +28,7 @@ const guides={
 export class V41Controller extends MesController{
  constructor(...args){super(...args);this.routeFilter='open';this.workScope='mine';this.workEquipment='';this.logDate='';this.logWorker='';this.portalCache=new Map();this.visibleLogs=[];}
  async load(page){if(page!==this.page){this.search='';this.pageNo=1;this.detail=null;this.workEquipment='';}this.page=page;
-  if(this.ctx?.version!=='4.1.0'){this.set(notice('v4.1 화면이지만 데이터베이스 확장이 아직 적용되지 않았습니다. 기존 v4.0 프로젝트에서 database/06_upgrade_v4_1.sql 적용 후 다시 로그인하세요. 로그인·config.js·기존 자료는 변경하지 않습니다.','warning'));return;}
+  if(!['4.1.0','4.2.0'].includes(this.ctx?.version)){this.set(notice('v4.1 화면이지만 데이터베이스 확장이 아직 적용되지 않았습니다. 기존 v4.0 프로젝트에서 database/06_upgrade_v4_1.sql 적용 후 다시 로그인하세요. 로그인·config.js·기존 자료는 변경하지 않습니다.','warning'));return;}
   if(page==='products'||['partners','customers','suppliers'].includes(page))return this.portalMasters(page);
   if(page==='materials'||page==='processes')return this.extraMasters(page);
   if(page==='templates')return this.templates();

@@ -1,475 +1,626 @@
 
-> dnm-cloud-mes@4.1.0 check
-> node tools/check.mjs
-
-JavaScript syntax OK: 25 files
-
-> dnm-cloud-mes@4.1.0 test
+> dnm-cloud-mes@4.2.0 test
 > node --test tests/*.test.js
 
 TAP version 13
 # Subtest: a write requires authentication before any network call
 ok 1 - a write requires authentication before any network call
   ---
-  duration_ms: 1.3324
+  duration_ms: 2.149203
   type: 'test'
   ...
 # Subtest: read sends public key plus user token and parses shared total
 ok 2 - read sends public key plus user token and parses shared total
   ---
-  duration_ms: 18.047213
+  duration_ms: 25.255065
   type: 'test'
   ...
 # Subtest: edit is conditional on record version and does not overwrite a conflict
 ok 3 - edit is conditional on record version and does not overwrite a conflict
   ---
-  duration_ms: 1.155984
+  duration_ms: 1.158507
   type: 'test'
   ...
 # Subtest: duplicate and permission errors are visible to the user
 ok 4 - duplicate and permission errors are visible to the user
   ---
-  duration_ms: 0.825225
+  duration_ms: 1.222386
   type: 'test'
   ...
 # Subtest: ambiguous failed write is not silently retried or reported as saved
 ok 5 - ambiguous failed write is not silently retried or reported as saved
   ---
-  duration_ms: 0.295255
+  duration_ms: 0.599112
   type: 'test'
   ...
 # Subtest: truncated response after write is also treated as an uncertain result
 ok 6 - truncated response after write is also treated as an uncertain result
   ---
-  duration_ms: 0.599419
+  duration_ms: 0.88211
   type: 'test'
   ...
 # Subtest: expired session refreshes once for simultaneous reads
 ok 7 - expired session refreshes once for simultaneous reads
   ---
-  duration_ms: 11.543567
+  duration_ms: 13.300918
   type: 'test'
   ...
 # Subtest: 401 triggers one token refresh and a single retry
 ok 8 - 401 triggers one token refresh and a single retry
   ---
-  duration_ms: 1.73038
+  duration_ms: 2.529487
   type: 'test'
   ...
 # Subtest: failed refresh clears session; logout clears session even on network failure
 ok 9 - failed refresh clears session; logout clears session even on network failure
   ---
-  duration_ms: 0.758584
+  duration_ms: 1.167782
   type: 'test'
   ...
 # Subtest: failed login connection never displays data-save instructions or echoes credentials
 ok 10 - failed login connection never displays data-save instructions or echoes credentials
   ---
-  duration_ms: 0.577911
+  duration_ms: 0.855576
   type: 'test'
   ...
 # Subtest: login timeout has an explicit code without implying a database write
 ok 11 - login timeout has an explicit code without implying a database write
   ---
-  duration_ms: 0.343959
+  duration_ms: 0.603918
   type: 'test'
   ...
 # Subtest: connection check sends only public key, no password or user authorization
 ok 12 - connection check sends only public key, no password or user authorization
   ---
-  duration_ms: 0.382807
+  duration_ms: 0.55795
   type: 'test'
   ...
 # Subtest: diagnostic reports email authentication disabled separately from reachability
 ok 13 - diagnostic reports email authentication disabled separately from reachability
   ---
-  duration_ms: 0.379002
+  duration_ms: 0.484196
   type: 'test'
   ...
 # Subtest: diagnostic rejects invalid public key with status, without blaming the password
 ok 14 - diagnostic rejects invalid public key with status, without blaming the password
   ---
-  duration_ms: 0.304379
+  duration_ms: 0.567679
   type: 'test'
   ...
 # Subtest: diagnostic preserves HTTP status even when a proxy returns HTML
 ok 15 - diagnostic preserves HTTP status even when a proxy returns HTML
   ---
-  duration_ms: 0.288766
+  duration_ms: 0.53793
   type: 'test'
   ...
 # Subtest: malformed settings and login responses cannot produce false success
 ok 16 - malformed settings and login responses cannot produce false success
   ---
-  duration_ms: 0.482148
+  duration_ms: 0.777351
   type: 'test'
   ...
 # Subtest: blank configuration fails visibly; HTTPS project URL is required
 ok 17 - blank configuration fails visibly; HTTPS project URL is required
   ---
-  duration_ms: 1.051246
+  duration_ms: 1.2231
   type: 'test'
   ...
 # Subtest: browser accepts public keys and rejects privileged keys
 ok 18 - browser accepts public keys and rejects privileged keys
   ---
-  duration_ms: 1.819725
+  duration_ms: 1.24879
   type: 'test'
   ...
 # Subtest: copied outer whitespace is removed; invalid key characters are rejected before fetch
 ok 19 - copied outer whitespace is removed; invalid key characters are rejected before fetch
   ---
-  duration_ms: 0.326212
+  duration_ms: 0.382914
   type: 'test'
   ...
 # Subtest: required and oversized data cannot reach the write call
 ok 20 - required and oversized data cannot reach the write call
   ---
-  duration_ms: 0.670801
+  duration_ms: 0.698788
   type: 'test'
   ...
 # Subtest: pagination and search preserve quoted input as one filter value
 ok 21 - pagination and search preserve quoted input as one filter value
   ---
-  duration_ms: 0.415767
+  duration_ms: 0.488269
   type: 'test'
   ...
 # Subtest: untrusted content is escaped before HTML rendering
 ok 22 - untrusted content is escaped before HTML rendering
   ---
-  duration_ms: 0.256086
+  duration_ms: 0.157145
   type: 'test'
   ...
 # Subtest: integer quantity checks prevent negatives, fractions, empty and unsafe values
 ok 23 - integer quantity checks prevent negatives, fractions, empty and unsafe values
   ---
-  duration_ms: 1.179779
+  duration_ms: 2.057603
   type: 'test'
   ...
 # Subtest: money precision accepts exactly at most two decimals
 ok 24 - money precision accepts exactly at most two decimals
   ---
-  duration_ms: 0.307103
+  duration_ms: 0.418876
   type: 'test'
   ...
 # Subtest: valid dates and Excel serial 1900/1904 schemes are explicit
 ok 25 - valid dates and Excel serial 1900/1904 schemes are explicit
   ---
-  duration_ms: 0.836972
+  duration_ms: 0.818608
   type: 'test'
   ...
 # Subtest: full shift is 460 minutes (7:40), not 7.40 hours
 ok 26 - full shift is 460 minutes (7:40), not 7.40 hours
   ---
-  duration_ms: 0.175575
+  duration_ms: 0.216223
   type: 'test'
   ...
 # Subtest: break overlap and overtime use exact integer minutes
 ok 27 - break overlap and overtime use exact integer minutes
   ---
-  duration_ms: 0.195055
+  duration_ms: 0.242522
   type: 'test'
   ...
 # Subtest: defect quantities cannot exceed total; zero quantities remain valid
 ok 28 - defect quantities cannot exceed total; zero quantities remain valid
   ---
-  duration_ms: 0.759646
+  duration_ms: 0.941597
   type: 'test'
   ...
 # Subtest: voice draft requires explicit numerals and never invents zero defects
 ok 29 - voice draft requires explicit numerals and never invents zero defects
   ---
-  duration_ms: 0.435386
+  duration_ms: 1.512049
   type: 'test'
   ...
 # Subtest: CSV values are escaped and formula prefixes neutralized
 ok 30 - CSV values are escaped and formula prefixes neutralized
   ---
-  duration_ms: 0.184849
+  duration_ms: 0.197126
   type: 'test'
   ...
 # Subtest: inactive and viewer accounts do not gain work rights from capabilities
 ok 31 - inactive and viewer accounts do not gain work rights from capabilities
   ---
-  duration_ms: 0.602609
+  duration_ms: 0.313416
   type: 'test'
   ...
 # Subtest: dashboard only counts final accepted quantity, not intermediate process sums
 ok 32 - dashboard only counts final accepted quantity, not intermediate process sums
   ---
-  duration_ms: 0.490951
+  duration_ms: 0.702263
   type: 'test'
   ...
 # Subtest: column positions support duplicate labels A..CD
 ok 33 - column positions support duplicate labels A..CD
   ---
-  duration_ms: 0.240032
+  duration_ms: 0.505232
   type: 'test'
   ...
 # Subtest: XML entities are decoded without HTML execution
 ok 34 - XML entities are decoded without HTML execution
   ---
-  duration_ms: 0.231599
+  duration_ms: 0.773019
   type: 'test'
   ...
 # Subtest: order import does not replace missing PO line with PR/contract item
 ok 35 - order import does not replace missing PO line with PR/contract item
   ---
-  duration_ms: 0.856482
+  duration_ms: 1.28695
   type: 'test'
   ...
 # Subtest: bad order quantities and repeated production no block import
 ok 36 - bad order quantities and repeated production no block import
   ---
-  duration_ms: 0.594958
+  duration_ms: 0.799388
   type: 'test'
   ...
 # Subtest: catalogue dedup keeps all source rows and never invents prices or units
 ok 37 - catalogue dedup keeps all source rows and never invents prices or units
   ---
-  duration_ms: 0.541076
+  duration_ms: 0.975914
   type: 'test'
   ...
 # Subtest: server command passes idempotency UUID unchanged for retries
 ok 38 - server command passes idempotency UUID unchanged for retries
   ---
-  duration_ms: 0.189937
+  duration_ms: 0.304947
   type: 'test'
   ...
 # Subtest: malformed command responses remain uncertain, never success
 ok 39 - malformed command responses remain uncertain, never success
   ---
-  duration_ms: 0.414976
+  duration_ms: 0.343196
   type: 'test'
   ...
 # Subtest: server 5xx becomes uncertain for safe keyed retry
 ok 40 - server 5xx becomes uncertain for safe keyed retry
   ---
-  duration_ms: 0.174293
+  duration_ms: 0.156145
   type: 'test'
   ...
 # Subtest: migration has transaction and no destructive table/auth deletion
 ok 41 - migration has transaction and no destructive table/auth deletion
   ---
-  duration_ms: 0.890613
+  duration_ms: 0.879859
   type: 'test'
   ...
 # Subtest: v4 business records cannot be directly mutated by authenticated browser
 ok 42 - v4 business records cannot be directly mutated by authenticated browser
   ---
-  duration_ms: 0.247574
+  duration_ms: 0.268884
   type: 'test'
   ...
 # Subtest: idempotent commands check request payload hash and serialize transitions
 ok 43 - idempotent commands check request payload hash and serialize transitions
   ---
-  duration_ms: 0.144388
+  duration_ms: 0.143301
   type: 'test'
   ...
 # Subtest: approval guards self approval, current step, mandatory next step and delegation expiry
 ok 44 - approval guards self approval, current step, mandatory next step and delegation expiry
   ---
-  duration_ms: 2.35975
+  duration_ms: 0.182223
   type: 'test'
   ...
 # Subtest: all implemented frontend workflow actions have server handlers
 ok 45 - all implemented frontend workflow actions have server handlers
   ---
-  duration_ms: 0.329106
+  duration_ms: 0.293203
   type: 'test'
   ...
 # Subtest: unsupported browser keeps typing available and disables only voice
 ok 46 - unsupported browser keeps typing available and disables only voice
   ---
-  duration_ms: 0.759005
+  duration_ms: 1.031874
   type: 'test'
   ...
 # Subtest: voice starts on click only, adds text without saving, and can abort
 ok 47 - voice starts on click only, adds text without saving, and can abort
   ---
-  duration_ms: 0.301104
+  duration_ms: 0.37008
   type: 'test'
   ...
 # Subtest: v41 all 12 requested Excel fields map to business fields
 ok 48 - v41 all 12 requested Excel fields map to business fields
   ---
-  duration_ms: 2.615345
+  duration_ms: 2.653962
   type: 'test'
   ...
 # Subtest: comma quantities and amounts retained without auto multiplying source price
 ok 49 - comma quantities and amounts retained without auto multiplying source price
   ---
-  duration_ms: 0.321535
+  duration_ms: 0.379799
   type: 'test'
   ...
 # Subtest: missing source amounts remain unknown, not zero
 ok 50 - missing source amounts remain unknown, not zero
   ---
-  duration_ms: 0.432172
+  duration_ms: 0.358496
   type: 'test'
   ...
 # Subtest: invalid source amounts block upload
 ok 51 - invalid source amounts block upload
   ---
-  duration_ms: 0.375276
+  duration_ms: 0.625728
   type: 'test'
   ...
 # Subtest: source 신규 state does not determine new product versus repeat production
 ok 52 - source 신규 state does not determine new product versus repeat production
   ---
-  duration_ms: 0.250488
+  duration_ms: 0.192208
   type: 'test'
   ...
 # Subtest: matching uses exact part not similar name
 ok 53 - matching uses exact part not similar name
   ---
-  duration_ms: 0.110156
+  duration_ms: 0.094285
   type: 'test'
   ...
 # Subtest: unreviewed/ambiguous templates never auto-match
 ok 54 - unreviewed/ambiguous templates never auto-match
   ---
-  duration_ms: 0.141995
+  duration_ms: 0.116351
   type: 'test'
   ...
 # Subtest: inactive templates are not offered as repeat production
 ok 55 - inactive templates are not offered as repeat production
   ---
-  duration_ms: 0.089515
+  duration_ms: 0.074714
   type: 'test'
   ...
 # Subtest: routing default sort part then due and missing due last
 ok 56 - routing default sort part then due and missing due last
   ---
-  duration_ms: 0.362127
+  duration_ms: 0.517169
   type: 'test'
   ...
 # Subtest: routing filters distinguish active done and historical revisions
 ok 57 - routing filters distinguish active done and historical revisions
   ---
-  duration_ms: 0.350409
+  duration_ms: 0.347598
   type: 'test'
   ...
 # Subtest: keyword search covers PO grade Project equipment and work note
 ok 58 - keyword search covers PO grade Project equipment and work note
   ---
-  duration_ms: 0.329317
+  duration_ms: 0.378468
   type: 'test'
   ...
 # Subtest: search does not expose arbitrary raw source columns
 ok 59 - search does not expose arbitrary raw source columns
   ---
-  duration_ms: 0.098659
+  duration_ms: 0.089564
   type: 'test'
   ...
 # Subtest: own work excludes other workers, unissued and closed routings
 ok 60 - own work excludes other workers, unissued and closed routings
   ---
-  duration_ms: 0.173071
+  duration_ms: 0.160519
   type: 'test'
   ...
 # Subtest: route progress uses per-process fractions and never sums as shipped quantity
 ok 61 - route progress uses per-process fractions and never sums as shipped quantity
   ---
-  duration_ms: 0.195715
+  duration_ms: 0.913358
   type: 'test'
   ...
 # Subtest: a route with pending quantities or no steps is not complete
 ok 62 - a route with pending quantities or no steps is not complete
   ---
-  duration_ms: 0.082254
+  duration_ms: 0.121538
   type: 'test'
   ...
 # Subtest: step editor validates both assignment values, explicit inspection code and names
 ok 63 - step editor validates both assignment values, explicit inspection code and names
   ---
-  duration_ms: 0.414164
+  duration_ms: 0.266542
   type: 'test'
   ...
 # Subtest: voice separates start stop and complete
 ok 64 - voice separates start stop and complete
   ---
-  duration_ms: 0.473054
+  duration_ms: 0.623379
   type: 'test'
   ...
 # Subtest: voice does not invent defect zero or ambiguous numbers
 ok 65 - voice does not invent defect zero or ambiguous numbers
   ---
-  duration_ms: 0.181554
+  duration_ms: 0.174645
   type: 'test'
   ...
 # Subtest: voice rejects defect greater than total
 ok 66 - voice rejects defect greater than total
   ---
-  duration_ms: 0.115084
+  duration_ms: 0.063288
   type: 'test'
   ...
 # Subtest: print retains source field labels and does not contain handwritten signature images
 ok 67 - print retains source field labels and does not contain handwritten signature images
   ---
-  duration_ms: 7.540554
+  duration_ms: 7.431716
   type: 'test'
   ...
 # Subtest: routing print includes continued sheets for more than ten steps
 ok 68 - routing print includes continued sheets for more than ten steps
   ---
-  duration_ms: 0.362237
+  duration_ms: 0.389044
   type: 'test'
   ...
 # Subtest: v41 migration preserves tables accounts and current data
 ok 69 - v41 migration preserves tables accounts and current data
   ---
-  duration_ms: 0.334234
+  duration_ms: 0.414772
   type: 'test'
   ...
 # Subtest: v41 keeps keyed transactional mutations and private helpers
 ok 70 - v41 keeps keyed transactional mutations and private helpers
   ---
-  duration_ms: 0.132109
+  duration_ms: 0.130596
   type: 'test'
   ...
 # Subtest: v41 requires reviewed exact template and consistent versions
 ok 71 - v41 requires reviewed exact template and consistent versions
   ---
-  duration_ms: 0.104988
+  duration_ms: 0.090611
   type: 'test'
   ...
 # Subtest: v41 closes routing only when all operations finish and no active/pending logs
 ok 72 - v41 closes routing only when all operations finish and no active/pending logs
   ---
-  duration_ms: 0.163817
+  duration_ms: 0.094872
   type: 'test'
   ...
 # Subtest: v41 preserves native-fetch receiver patch
 ok 73 - v41 preserves native-fetch receiver patch
   ---
-  duration_ms: 0.275425
+  duration_ms: 0.214978
   type: 'test'
   ...
 # Subtest: v41 keeps secrets out of delivered config and preserves CSP
 ok 74 - v41 keeps secrets out of delivered config and preserves CSP
   ---
-  duration_ms: 0.125179
+  duration_ms: 0.157506
   type: 'test'
   ...
 # Subtest: admin profile search uses name/email/role with safe query encoding
 ok 75 - admin profile search uses name/email/role with safe query encoding
   ---
-  duration_ms: 0.283568
+  duration_ms: 0.335625
   type: 'test'
   ...
 # Subtest: audit keyword search retains newest-first pagination
 ok 76 - audit keyword search retains newest-first pagination
   ---
-  duration_ms: 0.156156
+  duration_ms: 0.379688
   type: 'test'
   ...
-1..76
-# tests 76
+# Subtest: 22 modules independently separate read/create/update
+ok 77 - 22 modules independently separate read/create/update
+  ---
+  duration_ms: 1.008996
+  type: 'test'
+  ...
+# Subtest: worker only sees own work and shared notes pages
+ok 78 - worker only sees own work and shared notes pages
+  ---
+  duration_ms: 1.153817
+  type: 'test'
+  ...
+# Subtest: expand all cannot introduce unauthorized pages
+ok 79 - expand all cannot introduce unauthorized pages
+  ---
+  duration_ms: 0.285373
+  type: 'test'
+  ...
+# Subtest: inactive admin does not receive menus
+ok 80 - inactive admin does not receive menus
+  ---
+  duration_ms: 0.190618
+  type: 'test'
+  ...
+# Subtest: admin gets grouped setup and ACL menu
+ok 81 - admin gets grouped setup and ACL menu
+  ---
+  duration_ms: 0.166904
+  type: 'test'
+  ...
+# Subtest: viewer cannot mutate despite erroneous ACL create flags
+ok 82 - viewer cannot mutate despite erroneous ACL create flags
+  ---
+  duration_ms: 0.45843
+  type: 'test'
+  ...
+# Subtest: read-only user sees no create or update buttons
+ok 83 - read-only user sees no create or update buttons
+  ---
+  duration_ms: 0.192615
+  type: 'test'
+  ...
+# Subtest: create-only permission does not allow edit
+ok 84 - create-only permission does not allow edit
+  ---
+  duration_ms: 0.95626
+  type: 'test'
+  ...
+# Subtest: update-only allows import to update existing but not new form
+ok 85 - update-only allows import to update existing but not new form
+  ---
+  duration_ms: 0.396429
+  type: 'test'
+  ...
+# Subtest: quality mutations are not exposed to read-only quality user
+ok 86 - quality mutations are not exposed to read-only quality user
+  ---
+  duration_ms: 0.528357
+  type: 'test'
+  ...
+# Subtest: per-module write needs read too
+ok 87 - per-module write needs read too
+  ---
+  duration_ms: 0.140718
+  type: 'test'
+  ...
+# Subtest: employee identity and access permissions are different
+ok 88 - employee identity and access permissions are different
+  ---
+  duration_ms: 0.068693
+  type: 'test'
+  ...
+# Subtest: purchase approval additionally requires explicit capability
+ok 89 - purchase approval additionally requires explicit capability
+  ---
+  duration_ms: 0.082149
+  type: 'test'
+  ...
+# Subtest: bundle accepts staging masters but not actual worklogs
+ok 90 - bundle accepts staging masters but not actual worklogs
+  ---
+  duration_ms: 0.469837
+  type: 'test'
+  ...
+# Subtest: bundle duplicates fail before network requests
+ok 91 - bundle duplicates fail before network requests
+  ---
+  duration_ms: 0.410378
+  type: 'test'
+  ...
+# Subtest: archive is reference only input
+ok 92 - archive is reference only input
+  ---
+  duration_ms: 0.096599
+  type: 'test'
+  ...
+# Subtest: employee sorting executives then department position hire
+ok 93 - employee sorting executives then department position hire
+  ---
+  duration_ms: 0.373901
+  type: 'test'
+  ...
+# Subtest: SQL migration atomic additive no table truncate/delete
+ok 94 - SQL migration atomic additive no table truncate/delete
+  ---
+  duration_ms: 0.341254
+  type: 'test'
+  ...
+# Subtest: legacy RPC implementation inaccessible via public schema
+ok 95 - legacy RPC implementation inaccessible via public schema
+  ---
+  duration_ms: 0.099394
+  type: 'test'
+  ...
+# Subtest: read-only enforced in SQL wrapper not only menu
+ok 96 - read-only enforced in SQL wrapper not only menu
+  ---
+  duration_ms: 0.075715
+  type: 'test'
+  ...
+# Subtest: seed importer excludes production events from whitelist
+ok 97 - seed importer excludes production events from whitelist
+  ---
+  duration_ms: 0.258364
+  type: 'test'
+  ...
+# Subtest: draft creation carries original optimistic versions
+ok 98 - draft creation carries original optimistic versions
+  ---
+  duration_ms: 0.096273
+  type: 'test'
+  ...
+# Subtest: own-record checks return false for null mappings
+ok 99 - own-record checks return false for null mappings
+  ---
+  duration_ms: 0.060597
+  type: 'test'
+  ...
+# Subtest: ACL included in backup and private helper execute revoked
+ok 100 - ACL included in backup and private helper execute revoked
+  ---
+  duration_ms: 0.174121
+  type: 'test'
+  ...
+# Subtest: UI wiring retains fetch fix and config is not shipped
+ok 101 - UI wiring retains fetch fix and config is not shipped
+  ---
+  duration_ms: 0.281968
+  type: 'test'
+  ...
+# Subtest: batch importer stable keys and no automatic work creation
+ok 102 - batch importer stable keys and no automatic work creation
+  ---
+  duration_ms: 0.498737
+  type: 'test'
+  ...
+1..102
+# tests 102
 # suites 0
-# pass 76
+# pass 102
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 195.461275
+# duration_ms 247.004762

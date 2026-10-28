@@ -1,0 +1,68 @@
+-- DISPOSABLE CI DATABASE ONLY. No real accounts, names, keys or production data.
+-- Run the v4 and v4.1 integration suites BEFORE applying 08 twice and this file.
+SELECT public.test_assert(NOT has_schema_privilege('authenticated','dnm_private','USAGE'),'private schema not exposed to logged-in clients');
+SELECT public.test_assert(NOT has_function_privilege('authenticated','dnm_private.dnm_v41_command_impl(text,jsonb,uuid)','EXECUTE'),'legacy command cannot bypass module ACL');
+SELECT public.test_assert(NOT has_function_privilege('anon','public.dnm_v42_import(text,jsonb,jsonb,uuid)','EXECUTE'),'anonymous import denied');
+SELECT public.test_assert(NOT has_table_privilege('authenticated','public.dnm_v42_module_access','UPDATE'),'direct ACL writes denied');
+SELECT public.test_assert((SELECT count(*)=4 FROM auth.users),'no auth accounts replaced');
+SELECT public.test_assert((SELECT name='이전 버전 보존 시험품' FROM public.dnm_portal_products WHERE code='LEGACY-V3'),'v3 product preserved');
+DO $$
+DECLARE a uuid:='11111111-1111-4111-8111-111111111111';w uuid:='33333333-3333-4333-8333-333333333333';v uuid:='44444444-4444-4444-8444-444444444444';
+ acl jsonb;payload jsonb;k uuid;r jsonb;r2 jsonb;cnt bigint;rowx public.dnm_v4_records;oid uuid;tid uuid;rid uuid;wid uuid;eid uuid;
+BEGIN
+ PERFORM set_config('request.jwt.claim.sub',a::text,true);
+ PERFORM public.test_assert(public.dnm_v4_context()->>'version'='4.2.0','version 4.2 context');
+ SELECT jsonb_agg(jsonb_build_object('module',module,'read',module='products','create',false,'update',false,'scope','all','version',version)) INTO acl FROM public.dnm_v42_module_access WHERE profile_id=w;
+ PERFORM public.dnm_v42_set_access(w,acl,false,0,NULL,'CI read-only product test');
+ PERFORM set_config('request.jwt.claim.sub',w::text,true);
+ PERFORM public.test_assert(public.dnm_v42_allowed('products','read') AND NOT public.dnm_v42_allowed('products','create') AND NOT public.dnm_v42_allowed('orders','read'),'independent per-module rights');
+ PERFORM public.test_error('SELECT public.dnm_v4_command(''save_master'',''{"kind":"products","code":"DENIED42","title":"Forbidden","data":{"name":"Forbidden"}}''::jsonb,gen_random_uuid())','권한');
+ PERFORM public.test_error('SELECT public.dnm_v42_import(''TEST42'',''[]''::jsonb,''{}''::jsonb,gen_random_uuid())','관리자');
+ PERFORM public.test_assert(NOT public.dnm_v4_readable('order','{}'::jsonb,a,gen_random_uuid()),'order read cannot be inferred from another menu');
+ PERFORM set_config('request.jwt.claim.sub',a::text,true);
+ SELECT count(*) INTO cnt FROM public.dnm_v4_records WHERE kind='worklog';
+ payload:='[{"kind":"products","code":"V42-PART","title":"Synthetic product","data":{"unit":"EA"}},{"kind":"equipment","code":"V42-EQ","title":"Synthetic equipment","data":{"active":true,"manager_id":"11111111-1111-4111-8111-111111111111"}},{"kind":"source_routing","code":"V42-HISTORY","title":"Synthetic historical LOT","data":{"so_raw":"OLD-ONLY","qty":3}},{"kind":"route_template","code":"V42-PART","title":"Synthetic route","data":{"part_no":"V42-PART","steps":[{"code":"010","name":"Synthetic work","kind":"WORK"}],"active":true,"verified":true}},{"kind":"order","code":"V42-ORDER","title":"Synthetic order","data":{"production_no":"V42-ORDER","part_no":"V42-PART","part_name":"Synthetic product","customer":"Synthetic customer","qty":2,"priority":"NORMAL"}}]'::jsonb;
+ k:=gen_random_uuid();r:=public.dnm_v42_import('CI-V42',payload,'{}',k);r2:=public.dnm_v42_import('CI-V42',payload,'{}',k);
+ PERFORM public.test_assert(r=r2 AND (r->>'inserted')::integer=5,'initial import and idempotent request');
+ r:=public.dnm_v42_import('CI-V42',payload,'{}',gen_random_uuid());
+ PERFORM public.test_assert((r->>'inserted')::integer=0 AND (r->>'skipped')::integer=5,'new key re-import preserves existing records');
+ PERFORM public.test_assert((SELECT count(*)=cnt FROM public.dnm_v4_records WHERE kind='worklog'),'history import creates no operational work logs');
+ PERFORM public.test_assert((SELECT data->>'active'='false' AND NOT data ? 'manager_id' FROM public.dnm_v4_records WHERE code='V42-EQ' AND kind='equipment'),'seed cannot assign manager or activate silently');
+ SELECT id INTO oid FROM public.dnm_v4_records WHERE kind='order' AND code='V42-ORDER';
+ SELECT id INTO tid FROM public.dnm_v4_records WHERE kind='route_template' AND code='V42-PART';
+ SELECT * INTO rowx FROM public.dnm_v4_records WHERE id=oid;
+ r:=public.dnm_v42_create_drafts(jsonb_build_array(jsonb_build_object('id',oid,'version',rowx.version)),a);
+ PERFORM public.test_assert((SELECT count(*)=0 FROM public.dnm_v4_records WHERE kind='routing' AND parent_id=oid),'unreviewed template cannot create routing');
+ SELECT * INTO rowx FROM public.dnm_v4_records WHERE id=tid;
+ PERFORM public.dnm_v42_activate(jsonb_build_array(jsonb_build_object('id',tid,'version',rowx.version)),'CI reviewed template','');
+ SELECT * INTO rowx FROM public.dnm_v4_records WHERE id=oid;
+ r:=public.dnm_v42_create_drafts(jsonb_build_array(jsonb_build_object('id',oid,'version',rowx.version)),a);
+ PERFORM public.test_assert((SELECT count(*)=1 FROM public.dnm_v4_records WHERE kind='routing' AND parent_id=oid AND state='DRAFT'),'only draft generated');
+ r:=public.dnm_v42_create_drafts(jsonb_build_array(jsonb_build_object('id',oid,'version',rowx.version)),a);
+ PERFORM public.test_assert((SELECT count(*)=1 FROM public.dnm_v4_records WHERE kind='routing' AND parent_id=oid),'existing order routing is preserved');
+ PERFORM public.test_assert((SELECT count(*)=cnt FROM public.dnm_v4_records WHERE kind='worklog'),'draft generation creates no fake actuals');
+ SELECT id INTO wid FROM public.dnm_v4_records WHERE kind='employee' AND code='EMP-TEST';
+ SELECT id INTO eid FROM public.dnm_v4_records WHERE kind='equipment' AND code='V42-EQ';
+ SELECT jsonb_agg(jsonb_build_object('module',module,'read',module='worklogs','create',module='worklogs','update',module='worklogs','scope','own','version',version)) INTO acl FROM public.dnm_v42_module_access WHERE profile_id=w;
+ PERFORM public.dnm_v42_set_access(w,acl,false,0,NULL,'CI own worker test');
+ SELECT * INTO rowx FROM public.dnm_v4_records WHERE id=eid;
+ PERFORM public.dnm_v42_setup('equipment',jsonb_build_array(jsonb_build_object('id',eid,'version',rowx.version,'manager_id',a)),'CI equipment owner');
+ SELECT * INTO rowx FROM public.dnm_v4_records WHERE id=eid;
+ PERFORM public.dnm_v42_setup('assignment',jsonb_build_array(jsonb_build_object('id',eid,'version',rowx.version,'employee_id',wid,'processes',jsonb_build_array('Synthetic work'))),'CI assignment');
+ PERFORM set_config('request.jwt.claim.sub',w::text,true);
+ PERFORM public.test_assert(public.dnm_v42_allowed('worklogs','create') AND public.dnm_v42_scope('worklogs')='own','worker write limited to own assigned records');
+ PERFORM public.test_assert(NOT public.dnm_v4_readable('equipment','{}'::jsonb,a,gen_random_uuid()),'missing assignment is false, not nullable authorization');
+ PERFORM public.test_assert(NOT public.dnm_v4_readable('order','{}'::jsonb,w,oid),'worker does not inherit customer-order visibility');
+ PERFORM set_config('request.jwt.claim.sub',a::text,true);
+ SELECT jsonb_agg(jsonb_build_object('module',module,'read',true,'create',true,'update',false,'scope','all','version',version)) INTO acl FROM public.dnm_v42_module_access WHERE profile_id=v;
+ PERFORM public.test_error(format('SELECT public.dnm_v42_set_access(%L::uuid,%L::jsonb,false,0,NULL,%L)',v,acl::text,'CI cannot elevate viewer'),'조회자');
+ PERFORM public.test_assert(public.dnm_v4_backup() ? 'module_access','business backup includes ACL');
+END $$;
+-- Apply actual RLS as authenticated, not as the postgres owner.
+SELECT set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
+SET ROLE authenticated;
+SELECT public.test_assert((SELECT count(*)=0 FROM public.dnm_portal_products),'worker product SELECT filtered by RLS');
+SELECT public.test_assert((SELECT count(*)=0 FROM public.dnm_v4_records WHERE kind='order'),'worker orders SELECT filtered by RLS');
+SELECT public.test_assert((SELECT count(*)=22 FROM public.dnm_v42_module_access),'worker reads own ACL only');
+RESET ROLE;
+SELECT 'DNM v4.2 disposable integration tests completed' AS result;
