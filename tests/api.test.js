@@ -44,3 +44,33 @@ test('failed refresh clears session; logout clears session even on network failu
  const api=apiWith(async()=>response({},400));api.keep({...session(),expires_at:1});await assert.rejects(()=>api.rows('notes'),/만료/);assert.equal(api.session,null);
  const a=apiWith(async()=>{throw Error('offline');});await assert.rejects(()=>a.logout());assert.equal(a.session,null);
 });
+test('failed login connection never displays data-save instructions or echoes credentials',async()=>{
+ const api=apiWith(async()=>{throw Error('network');});api.keep(null);
+ await assert.rejects(()=>api.login('person@example.test','private-password'),e=>e.code==='CONNECTION_FAILED'&&e.unknown===false&&/로그인 서버/.test(e.message)&&!/저장됐|private-password|person@example/.test(e.message));
+ assert.equal(api.session,null);
+});
+test('login timeout has an explicit code without implying a database write',async()=>{
+ const api=apiWith(async()=>{const e=Error('timeout');e.name='TimeoutError';throw e;});api.keep(null);
+ await assert.rejects(()=>api.login('person@example.test','private-password'),e=>e.code==='TIMEOUT'&&!e.unknown&&!/저장/.test(e.message));
+});
+test('connection check sends only public key, no password or user authorization',async()=>{
+ let calls=0;const api=apiWith(async(u,o)=>{calls++;assert.match(u,/\/auth\/v1\/settings$/);assert.equal(o.method,'GET');assert.equal(o.headers.Authorization,undefined);assert.equal(o.body,undefined);return response({external:{email:true}});});
+ const r=await api.checkConnection();assert.equal(r.emailEnabled,true);assert.equal(calls,1);
+});
+test('diagnostic reports email authentication disabled separately from reachability',async()=>{
+ const api=apiWith(async()=>response({external:{email:false}}));assert.equal((await api.checkConnection()).emailEnabled,false);
+});
+test('diagnostic rejects invalid public key with status, without blaming the password',async()=>{
+ const api=apiWith(async()=>response({message:'Invalid API key'},401));
+ await assert.rejects(()=>api.checkConnection(),e=>e.status===401&&/공개용 키/.test(e.message)&&!/비밀번호/.test(e.message));
+});
+test('diagnostic preserves HTTP status even when a proxy returns HTML',async()=>{
+ const api=apiWith(async()=>new Response('<h1>Unavailable</h1>',{status:503}));
+ await assert.rejects(()=>api.checkConnection(),e=>e.status===503&&e.code==='HTTP_503');
+});
+test('malformed settings and login responses cannot produce false success',async()=>{
+ const api=apiWith(async()=>response({ok:true}));api.keep(null);
+ await assert.rejects(()=>api.checkConnection(),e=>e.code==='INVALID_RESPONSE');
+ await assert.rejects(()=>api.login('person@example.test','password'),e=>e.code==='INVALID_RESPONSE'&&!e.unknown);
+ assert.equal(api.session,null);
+});

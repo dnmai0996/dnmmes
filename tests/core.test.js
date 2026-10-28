@@ -12,6 +12,10 @@ test('browser accepts public keys and rejects privileged keys',()=>{
  assert.equal(settings(url,jwt('anon')).key,jwt('anon'));
  for(const key of ['sb_secret_example',jwt('service_role'),jwt('authenticated'),'broken'])assert.throws(()=>settings(url,key));
 });
+test('copied outer whitespace is removed; invalid key characters are rejected before fetch',()=>{
+ assert.equal(settings(' '+url+'\n',' sb_publishable_example\n').key,'sb_publishable_example');
+ for(const key of ['sb_publishable_여기에붙여넣기','sb_publishable_ab cd','sb_publishable_ab\ncd'])assert.throws(()=>settings(url,key),/공개용 키/);
+});
 test('required and oversized data cannot reach the write call',()=>{
  assert.throws(()=>cleanRecord('notes',{title:'  ',body:'내용'}),/필수/);
  assert.throws(()=>cleanRecord('products',{code:'X',name:'a'.repeat(201)}),/길이/);

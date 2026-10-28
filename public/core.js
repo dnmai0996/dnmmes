@@ -1,10 +1,12 @@
-export const VERSION='3.0.0-admin.1';
+export const VERSION='3.0.1-admin.1';
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function settings(url,key){
+ url=String(url??'').trim();key=String(key??'').trim();
  if(!url||!key)throw Error('config.js에 Supabase URL과 공개용 키를 입력하세요.');
  let u;try{u=new URL(url);}catch{throw Error('Supabase URL 형식을 확인하세요.');}
  if(u.protocol!=='https:'||!u.hostname.endsWith('.supabase.co')||u.username||u.password||u.search||u.hash||!['','/'].includes(u.pathname))throw Error('Project URL은 https://프로젝트번호.supabase.co 형식이어야 합니다.');
  if(key.startsWith('sb_secret_'))throw Error('Secret key를 사용할 수 없습니다. Publishable key로 바꾸세요.');
+ if(!/^[\x21-\x7e]+$/.test(key))throw Error('공개용 키에 공백·줄바꿈·한글 등이 포함되어 있습니다. 실제 Publishable key 전체를 다시 복사하세요.');
  if(!key.startsWith('sb_publishable_')){
   let p;try{p=JSON.parse(atob(key.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));}catch{throw Error('Publishable key 또는 기존 anon public 키를 입력하세요.');}
   if(p.role!=='anon')throw Error('이 키는 브라우저에서 사용할 수 없습니다. anon public 키만 허용합니다.');

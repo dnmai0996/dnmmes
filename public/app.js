@@ -13,7 +13,17 @@ function guarded(fn){return async()=>{try{await fn();}catch(e){fail(e);}};}
 function login(msg=''){
  generation++;me=null;stopVoice();$('#editor').close();
  $('#app').innerHTML=`<div class="login"><section class="hero"><div class="brand">DNM</div><div class="eyebrow">CONNECTED WORKSPACE</div><h1>어디서든 이어지는<br>우리의 업무.</h1><p>품목과 거래처를 함께 관리하고,<br>메모를 팀과 공유하세요.</p></section><section class="loginbox"><div><span class="tag">공통관리판 · ${VERSION}</span><h2>개인 계정으로 로그인</h2><p class="muted">회사에서 등록한 이메일과 비밀번호를 사용하세요.</p><form id="loginForm"><label>이메일<input name="email" type="email" autocomplete="username" required></label><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="full">로그인</button></form><div id="message" class="message${msg?' error':''}" role="status" ${msg?'':'hidden'}>${esc(msg)}</div><p class="muted">계정 발급·잠금 해제는 관리자에게 요청하세요.</p><p><a href="setup.html" target="_blank" rel="noopener">처음 설치하는 담당자 안내</a></p><small>Ollama 미연결 · 기본 업무 사용 가능</small></div></section></div>`;
- $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;try{const f=Object.fromEntries(new FormData(e.target));await api.login(f.email.trim(),f.password);await enter();}catch(x){message(x.message,true);}finally{b.disabled=false;}};
+ $('#message').insertAdjacentHTML('afterend',`<details id="diagnostics"><summary>Supabase 연결 진단</summary><p class="message">연결 주소: ${esc(api.c.url)}</p><button id="checkConnection" type="button" class="secondary full">연결 확인 (비밀번호 불필요)</button><div id="diagnosticResult" class="message" role="status" hidden></div></details>`);
+ $('#checkConnection').onclick=async()=>{
+  const button=$('#checkConnection'),box=$('#diagnosticResult');button.disabled=true;box.hidden=false;box.className='message';box.textContent='인증 서비스 연결을 확인하고 있습니다…';
+  try{const result=await api.checkConnection();
+   if(result.emailEnabled===false){box.className='message error';box.textContent='인증 서비스에 접속했지만 이메일 로그인이 꺼져 있습니다. Supabase Authentication → Sign In / Providers에서 Email을 확인하세요.';}
+   else box.textContent='인증 서비스의 공개 설정을 정상 조회했습니다. '+(result.emailEnabled===true?'이메일 로그인도 활성화되어 있습니다. ':'이메일 로그인 활성 상태는 이 응답에서 확인되지 않았습니다. ')+'이제 로그인해 계정과 업무 DB 접근을 확인하세요.';
+  }catch(x){box.className='message error';box.textContent=x.message;
+   if(['CONNECTION_FAILED','TIMEOUT'].includes(x.code))box.textContent+='\n확인 순서: 위 주소를 Supabase의 실제 Project URL과 대조 → 프로젝트 실행 상태 확인 → 휴대폰 모바일 데이터로 같은 Netlify 주소에서 연결 진단. 브라우저 차단·DNS·통신 오류는 이 결과만으로 구분할 수 없습니다.';
+  }finally{button.disabled=false;}
+ };
+ $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;try{const f=Object.fromEntries(new FormData(e.target));await api.login(f.email.trim(),f.password);await enter();}catch(x){message(x.message,true);if(['CONNECTION_FAILED','TIMEOUT','INVALID_RESPONSE','HTTP_401'].includes(x.code)&&$('#diagnostics'))$('#diagnostics').open=true;}finally{b.disabled=false;}};
 }
 async function enter(){
  const {data}=await api.rows('profiles','select=*&id=eq.'+encodeURIComponent(api.session.user.id));me=data[0];
@@ -62,7 +72,7 @@ function openForm(title,body,save,{voice=false}={}){
  const close=()=>{stopVoice();d.close();};$('#close').onclick=close;d.oncancel=()=>stopVoice();
  if(voice)stopVoice=voiceFor($('#noteBody'),$('#voice'),$('#voiceState'));
  d.querySelector('form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요. 표시된 입력란을 수정한 후 저장하세요.',true),true);
- d.querySelector('form').onsubmit=async e=>{e.preventDefault();const button=$('#save'),cancel=$('#close');let unknown=false;button.disabled=true;cancel.disabled=true;d.oncancel=x=>x.preventDefault();stopVoice();try{await save(Object.fromEntries(new FormData(e.target)));close();if(me){try{await load();message('저장했습니다.');}catch(x){message('저장은 완료됐지만 목록을 다시 조회하지 못했습니다. '+x.message,true);}}}catch(x){message(x.message,true);unknown=!!x.unknown;if(unknown)button.textContent='닫고 목록을 확인하세요';}finally{button.disabled=unknown;cancel.disabled=false;d.oncancel=()=>stopVoice();}};
+ d.querySelector('form').onsubmit=async e=>{e.preventDefault();const button=$('#save'),cancel=$('#close');let unknown=false;button.disabled=true;cancel.disabled=true;d.oncancel=x=>x.preventDefault();stopVoice();try{await save(Object.fromEntries(new FormData(e.target)));close();if(me){try{await load();message('저장했습니다.');}catch(x){message('저장은 완료됐지만 목록을 다시 조회하지 못했습니다. '+x.message,true);}}}catch(x){message(x.message,true);unknown=!!x.unknown;if(unknown)button.textContent='닫고 결과를 확인하세요';}finally{button.disabled=unknown;cancel.disabled=false;d.oncancel=()=>stopVoice();}};
 }
 function edit(kind,r){
  let body='';if(kind==='notes')body=field('title','제목',r?.title,'text','required maxlength="160"')+`<label>내용<textarea id="noteBody" name="body" required maxlength="10000">${esc(r?.body)}</textarea></label><div class="speech-row"><button id="voice" type="button" class="secondary">음성 입력</button><span id="voiceState" role="status">브라우저 음성인식은 외부 서비스에서 처리될 수 있습니다. 인식 결과를 확인한 후 저장하세요.</span></div>`;
