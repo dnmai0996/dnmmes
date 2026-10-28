@@ -1,6 +1,6 @@
-export const V4='4.0.0';
+export const V4='4.1.0';
 export const CAPS={master:'기준정보 관리',production:'생산관리',purchase:'구매·입고·정산',quality:'품질·출하',approve:'구매 결재',work:'본인 작업실적'};
-export const KINDS={order:'고객 수주',order_source:'수주 원본',equipment:'설비',instrument:'계측기',catalog:'공구·공급업체',employee:'작업자',assignment:'설비·작업자 연결',route_template:'공정 템플릿',routing:'Routing Sheet',operation:'공정 작업지시',worklog:'작업일보',purchase:'구매요청',receipt:'구매입고',settlement:'정산',quality:'검사기록',shipment:'출하',customer_return:'고객 반품',material:'자재·외주 처리',urgency:'긴급지시',quality_doc:'품질문서',batch:'자료 업로드',part_detail:'품목 원본'};
+export const KINDS={material_master:'자재',process_master:'공정',order:'고객 수주',order_source:'수주 원본',equipment:'설비',instrument:'계측기',catalog:'공구·공급업체',employee:'작업자',assignment:'설비·작업자 연결',route_template:'공정 템플릿',routing:'Routing Sheet',operation:'공정 작업지시',worklog:'작업일보',purchase:'구매요청',receipt:'구매입고',settlement:'정산',quality:'검사기록',shipment:'출하',customer_return:'고객 반품',material:'자재·외주 처리',urgency:'긴급지시',quality_doc:'품질문서',batch:'자료 업로드',part_detail:'품목 원본'};
 export const STATUS={DRAFT:'초안',OPEN:'진행',CLOSED:'마감',CANCELLED:'취소',RELEASED:'배포',SUPERSEDED:'이전 버전',WAIT:'대기',ACTIVE:'작업 중',PENDING:'수량 확인대기',CONFIRMED:'확정',DONE:'완료',HOLD:'보류',SUBMITTED:'결재 중',APPROVED:'승인',REJECTED:'반려',ORDERED:'발주',PARTIAL:'부분입고',RECEIVED:'입고완료',MATCHED:'대사완료',PAID:'지급기록',REQUESTED:'요청',ACKNOWLEDGED:'현장확인',ACCEPT:'합격',REJECT:'불합격',REVIEW:'검토대기',INACTIVE:'사용중지'};
 export const TYPES={WORK:'가공·작업',MATERIAL:'자재입고',INSPECTION:'검사',OUTSOURCE:'외주',PACK:'포장·출하준비'};
 export const clone=x=>JSON.parse(JSON.stringify(x));
@@ -34,7 +34,7 @@ export function voiceDraft(s){
 export function csvCell(v){const s=String(v??'');return '"'+(/^(?:\s*[=+\-@]|[\t\r])/.test(s)?"'":'')+s.replace(/"/g,'""')+'"';}
 export const csv=rows=>'\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 export function orderProgress(order,routings,ops,logs,quality){
- const rid=new Set(routings.filter(x=>x.parent_id===order.id&&x.state==='RELEASED').map(x=>x.id));const o=ops.filter(x=>rid.has(x.parent_id));
+ const rid=new Set(routings.filter(x=>x.parent_id===order.id&&['RELEASED','DONE'].includes(x.state)).map(x=>x.id));const o=ops.filter(x=>rid.has(x.parent_id));
  const accepted=quality.filter(x=>x.parent_id===order.id&&x.state==='CONFIRMED'&&x.data.stage==='FINAL').reduce((a,x)=>a+Number(x.data.good||0),0);
  const q=Number(order.data.qty||0);return {ops:o.length,done:o.filter(x=>x.state==='DONE').length,accepted,percent:q?Math.min(100,Math.floor(accepted/q*100)):0,pending:logs.filter(x=>x.state==='PENDING'&&o.some(op=>op.id===x.parent_id)).length};
 }

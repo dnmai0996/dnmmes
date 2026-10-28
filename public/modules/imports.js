@@ -1,4 +1,4 @@
-import {excelDate,qty,text} from './domain.js';
+import {excelDate,qty,text,money} from './domain.js';
 import {columnLetter} from './xlsx.js';
 const norm=v=>String(v??'').replace(/\s|[\n\r]/g,'').toUpperCase();
 const source=(file,sh,row)=>({file,sheet:sh.name,row:row.rowNo});
@@ -8,13 +8,15 @@ function index(h,aliases){return h.values.findIndex(v=>aliases.some(x=>norm(x)==
 export function previewOrders(book,file){
  const out=[];
  for(const sh of book.sheets){const head=mappedHeader(sh,[['생산오더','생산오더번호'],['자재코드','품번'],['발주수량','수량']]);if(!head)continue;
- const ix={production_no:index(head,['생산오더','생산오더번호']),part_no:index(head,['자재코드','품번']),part_name:index(head,['자재명','품명']),qty:index(head,['발주수량','수량']),po_no:index(head,['PO 번호','PO번호']),po_line:index(head,['PO행번호','PO품목번호']),due_date:index(head,['납기일자','납기일']),order_date:index(head,['발주일자']),project:index(head,['Project내역','사업'])};
+ const ix={production_no:index(head,['생산오더','생산오더번호']),part_no:index(head,['자재코드','품번']),part_name:index(head,['자재명','품명']),qty:index(head,['발주수량','수량']),po_no:index(head,['PO 번호','PO번호']),po_line:index(head,['PO행번호','PO품목번호']),due_date:index(head,['납기일자','납기일']),order_date:index(head,['발주일자']),project:index(head,['Project내역','사업']),grade_code:index(head,['등급코드']),received_qty:index(head,['입고수량']),unit_price:index(head,['발주단가']),order_amount:index(head,['발주금액']),source_status:index(head,['상태'])};
  const cols=head.values.map((v,i)=>({key:columnLetter(i),letter:columnLetter(i),label:string(v)||'(공란)'}));
  for(const r of sh.rows.filter(r=>r.rowNo>head.rowNo)){
   const get=k=>ix[k]>=0?r.values[ix[k]]:'';if(!get('production_no')&&!get('part_no'))continue;const errors=[...(r.issues||[])],issues=[];
   const data={production_no:string(get('production_no')),part_no:string(get('part_no')),part_name:string(get('part_name')),po_no:string(get('po_no')),po_line:string(get('po_line')),project:string(get('project')),priority:'NORMAL',qty:get('qty'),due_date:'',order_date:''};
+  data.grade_code=string(get('grade_code'));data.source_status=string(get('source_status'));
+  for(const key of ['received_qty','unit_price','order_amount']){const raw=get(key);data[key]=null;if(raw!==''&&raw!==null&&raw!==undefined)try{const clean=String(raw).replace(/,/g,'').trim();data[key]=key==='received_qty'?qty(clean,'입고수량'):money(clean);}catch(e){errors.push(key+': '+e.message);}}
   if(!data.production_no)errors.push('생산오더 누락');if(!data.part_no)errors.push('품번 누락');
-  try{data.qty=qty(data.qty,'발주수량',false);}catch(e){errors.push(e.message);}
+  try{data.qty=qty(String(data.qty??'').replace(/,/g,''),'발주수량',false);}catch(e){errors.push(e.message);}
   for(const key of ['due_date','order_date'])try{data[key]=excelDate(get(key),book.date1904);}catch(e){errors.push(key+': '+e.message);}
   if(!data.due_date)issues.push('납기 공란 확인');if(!data.po_line)issues.push('PO 행번호 미제공: 계약품목번호·PR순번 대입 금지');
   if(!data.part_name)issues.push('품명 공란 확인');

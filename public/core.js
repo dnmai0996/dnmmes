@@ -1,4 +1,4 @@
-export const VERSION='4.0.0';
+export const VERSION='4.1.0';
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function settings(url,key){
  url=String(url??'').trim();key=String(key??'').trim();
@@ -26,4 +26,10 @@ export function cleanRecord(kind,f){
  if(kind==='products')return {...x,project:get('project',200),unit:get('unit',20)};
  const category=get('category',20,true);if(!['customer','supplier','both'].includes(category))throw Error('거래처 구분 오류');
  return {...x,category,contact:get('contact',100),phone:get('phone',80)};
+}
+
+export function adminListQuery(kind,page,search=''){
+ const q=new URLSearchParams({select:'*',order:kind==='audit'?'created_at.desc':'email.asc',limit:'25',offset:String(Math.max(0,page-1)*25)});
+ if(search){const term='"*'+String(search).slice(0,160).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'*"';const fields=kind==='audit'?['entity','action']:['email','display_name','role'];q.set('or','('+fields.map(k=>k+'.ilike.'+term).join(',')+')');}
+ return q.toString();
 }
