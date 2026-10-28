@@ -1,0 +1,8 @@
+Version: DNM Cloud MES 4.0.1 Connection Hotfix
+Change: PortalApi fetch receiver binding correction (public/api.js)
+Original Chromium native fetch test: FAILED with CONNECTION_FAILED
+Patched Chromium native fetch test: PASSED
+Existing test suite: 47 pass / 0 fail
+JavaScript syntax: OK
+Live Supabase/Auth: NOT TESTED (requires user's environment)
+Data migration: NONE

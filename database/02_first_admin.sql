@@ -3,7 +3,7 @@
 -- 비밀번호/OTP/Secret key를 이 SQL에 입력하지 마세요.
 DO $$
 DECLARE
-  admin_email text := '관리자이메일입력';
+  admin_email text := 'dnmai0996@gmail.com';
   admin_id uuid;
 BEGIN
   IF admin_email = '관리자이메일입력' THEN RAISE EXCEPTION '관리자 이메일을 먼저 입력하세요.'; END IF;
