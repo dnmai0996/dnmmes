@@ -1,0 +1,25 @@
+body.dnm-working,body.dnm-working *{cursor:progress!important}
+.activity-panel{position:fixed;bottom:22px;right:22px;z-index:20000;background:#10283f;color:#fff;border-radius:14px;box-shadow:0 8px 28px #081e3940;padding:14px 18px;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 24px));font-size:15px;pointer-events:none}
+.activity-panel[hidden],.backup-progress[hidden]{display:none}
+.activity-panel progress{width:90px}
+.activity-spinner{display:inline-block;width:21px;height:21px;min-width:21px;border:3px solid #9cbad6;border-top-color:#13d6c0;border-radius:50%;animation:dnm-spin .8s linear infinite}
+@keyframes dnm-spin{to{transform:rotate(360deg)}}
+.backup-intro{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.backup-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.backup-layout .card{min-width:0;margin-bottom:18px}
+.backup-layout input{max-width:100%}
+.backup-progress{position:sticky;top:0;display:flex;align-items:center;gap:12px;background:#e5f6f3;padding:16px;border-radius:12px;z-index:10;margin:12px 0;color:#103b46}
+.backup-progress progress{min-width:60px;flex:1;max-width:260px;accent-color:#087b76}
+.backup-layout p,.restore-plan p{overflow-wrap:anywhere;line-height:1.65}
+.restore-plan{border:2px solid #d38840}
+.restore-plan h3{margin-top:26px}
+.restore-plan form{max-width:760px}
+button.danger{background:#b73124;color:white}
+#backupSaved,#safetyChecked{color:#086b56;font-weight:600}
+.help-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.help-technical{border:1px solid #dbe5ee;border-radius:10px;padding:14px;margin:20px 0}
+.help-technical summary{font-weight:700;cursor:pointer}
+.help-technical p{line-height:1.65;overflow-wrap:anywhere}
+.manual-link{display:inline-flex;padding:12px 16px;background:#edf4fc;border-radius:10px;color:#123f6a;text-decoration:none;align-items:center;min-height:44px}
+@media(max-width:800px){.backup-layout{grid-template-columns:1fr}.backup-intro{align-items:flex-start}.backup-progress{flex-wrap:wrap}.activity-panel{left:12px;right:12px;bottom:12px}.backup-layout input[type=file]{font-size:14px}.restore-plan{padding:18px}.help-tabs{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.activity-spinner{animation:none}}

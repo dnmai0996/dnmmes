@@ -1,0 +1,9 @@
+{
+  "name": "dnm-cloud-mes",
+  "private": true,
+  "version": "4.9.0",
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs"
+  }
+}
