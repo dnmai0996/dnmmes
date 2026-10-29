@@ -18,7 +18,9 @@ export class V43Controller extends V421Controller{
   return result;
  }
  async userAccounts(){
-  if(this.ctx.account_management!=='4.3.0'){this.set(notice('작업자 로그인 기능 설치를 확인하세요.','warning'));return;}
+  try{await this.syncActiveWorkers();}catch(e){
+   const rows=await this.rec('employee');this.set(notice('로그인 연결 기능을 확인하지 못했습니다. 작업자 명부는 보존되어 있습니다. '+e.message,'warning')+table(['사번','성명','사용상태'],rows.map(r=>[esc(r.code),esc(r.title),r.data.active?'사용':'미사용'])));return;
+  }
   const data=await this.accounts.list();
   this.loginWorkers=(data.workers||[]).sort((a,b)=>employeeSort({title:a.name,data:a},{title:b.name,data:b}));
   const q=this.search.trim().toLowerCase();
@@ -28,8 +30,8 @@ export class V43Controller extends V421Controller{
   this.set(`<div class="card"><div class="sectionhead"><div><h2>작업자 사용·로그인 관리</h2><p class="muted">작업자 기준정보와 같은 목록을 사용합니다. 사용·중지 시 계정 접근도 함께 변경됩니다.</p></div><button id="accountHealth" type="button" class="secondary">연결 확인</button></div>
   ${notice('직원 ID는 본인 이름입니다. 신규 직원은 초기번호 1111로 처음 접속하여 본인 비밀번호를 설정합니다. 동명이인은 이름-2로 구분합니다.')}
   ${data.name_login?'':notice('이름 로그인 설정(SQL 18)을 먼저 확인해야 합니다.','warning')}
-  <div class="account-stats"><span>등록 작업자 <b>${this.loginWorkers.length}</b>명</span><span>사용 <b>${active}</b>명</span><span>정상 로그인 <b>${ready}</b>명</span></div>
-  ${this.top()}<div id="accountServiceState" role="status"></div>
+  <div class="account-stats"><span>등록 작업자 <b>${this.loginWorkers.length}</b>명</span><span>사용 <b>${active}</b>명</span><span>비밀번호 설정 완료 <b>${ready}</b>명</span></div>
+  ${this.syncErrorHtml()}${this.top()}${btn('syncWorkers','계정 연결 재시도')}<div id="accountServiceState" role="status"></div>
   ${table(['작업자 사용','작업자 / 로그인 ID','사번 / 부서','로그인 상태','관리'],this.pagedCells(filtered,w=>{
    const protectedUser=w.protected||w.profile_id===this.ctx.profile.id;
    return [
@@ -40,7 +42,7 @@ export class V43Controller extends V421Controller{
     protectedUser?'관리자 계정 보호':(!w.employee_active?'사용 전환 후 발급·초기화':!w.profile_id?btn('accountEnroll','1111 계정 발급',w.id,'primary'):btn('accountReset','1111 초기화',w.id))
    ];
   }))}<div id="v4pager" class="pagination"></div>
-  <p class="muted">퇴직자 사용중지 후에도 작업일보·작업배정 이력은 삭제되지 않습니다. 사용 체크와 계정 발급은 별도입니다. 계정 미발급 직원은 한 번 발급한 뒤 30분 이내에 첫 비밀번호를 설정하세요.</p></div>`);
+  <p class="muted">퇴직자 사용중지 후에도 작업일보·작업배정 이력은 삭제되지 않습니다. 사용 중인 직원의 계정은 자동 연결됩니다. 오류가 표시되면 연결 재시도를 실행하세요.</p></div>`);
   this.pageFooter(filtered);
   const searchInput=$('#v4search');if(searchInput)searchInput.placeholder='이름·사번·부서 검색';
   all('[data-account-check]').forEach(c=>c.onchange=()=>{
@@ -61,13 +63,49 @@ export class V43Controller extends V421Controller{
   const registering=action==='provision';
   if(!w.employee_active)throw Error('먼저 작업자를 사용으로 전환하세요.');
   const title=registering?'이름(ID) 로그인 계정 발급':'초기번호 1111 재발급';
-  const dlg=modal(title,`<p><strong>${esc(w.name)}</strong> · ${esc(w.code)}</p>${notice(registering?'본인 이름과 초기번호 1111로 첫 로그인 후 비밀번호를 변경하게 됩니다.':'비밀번호를 잊은 직원에게 초기번호 1111을 다시 발급합니다.')} ${area('reason','변경 사유',registering?'재직자 확인 후 로그인 계정 발급':'비밀번호 분실','required minlength="2" maxlength="1000"')}${registering?'':input('admin_password','관리자 본인의 현재 비밀번호','','password','required autocomplete="current-password"')}<label class="check"><input type="checkbox" name="confirm_owner" required>재직자 본인을 확인했습니다.</label><p class="muted">이메일을 입력할 필요가 없습니다. 초기번호 1111은 30분 동안만 사용 가능하며 최초 개인 비밀번호 설정 후 폐기됩니다.</p>`,async(f,key)=>{
+  const dlg=modal(title,`<p><strong>${esc(w.name)}</strong> · ${esc(w.code)}</p>${notice(registering?'본인 이름과 초기번호 1111로 첫 로그인 후 비밀번호를 변경하게 됩니다.':'비밀번호를 잊은 직원에게 초기번호 1111을 다시 발급합니다.')} ${area('reason','변경 사유',registering?'재직자 확인 후 로그인 계정 발급':'비밀번호 분실','required minlength="2" maxlength="1000"')}${registering?'':input('admin_password','관리자 본인의 현재 비밀번호','','password','required autocomplete="current-password"')}<label class="check"><input type="checkbox" name="confirm_owner" required>재직자 본인을 확인했습니다.</label><p class="muted">이메일을 입력할 필요가 없습니다. 초기번호 1111은 최초 개인 비밀번호 설정 전까지 사용하며, 설정 완료 후에는 사용할 수 없습니다.</p>`,async(f,key)=>{
    const result=await this.accounts.request(action,{employee_id:w.id,version:w.version,email:registering?'':w.email,request_id:key,reason:f.reason,admin_password:f.admin_password,confirm_owner:f.confirm_owner==='on'});
    await this.userAccounts();const el=$('#accountServiceState');if(el)el.innerHTML=notice(result.message);
   },registering?'계정 발급':'초기화');
   dlg.classList.add('account-dialog');
  }
+ async syncActiveWorkers(){
+  if(this._workerSync)return this._workerSync;
+  this._workerSync=(async()=>{
+   this.set(notice('사용 중인 작업자의 로그인 계정을 확인하고 있습니다. 잠시 기다려 주세요.'));
+   const result=await this.accounts.ensureActive((done,total)=>this.set(notice(`작업자 로그인 자동 연결 ${done} / ${total}명`)));
+   this.workerSyncErrors=result.failures;
+   this.ctx=await this.s.context();
+   return result;
+  })();
+  try{return await this._workerSync;}finally{this._workerSync=null;}
+ }
+ async access(){
+  await this.syncActiveWorkers();
+  const [data,perms,acl]=await Promise.all([this.accounts.list(),this.s.permissions(),this.api.request('/rest/v1/dnm_v42_module_access?select=*')]);
+  this.permissions=perms;this.aclRows=acl.data;
+  const workers=data.workers||[],linked=new Set(workers.map(w=>w.profile_id).filter(Boolean));
+  // Include stopped profiles in admin editor; the server remains authoritative for permissions.
+  for(const w of workers)if(w.profile_id&&!this.ctx.people.some(x=>x.id===w.profile_id))this.ctx.people.push({id:w.profile_id,name:w.name,role:w.role});
+  const rows=workers.map(w=>({name:w.name,code:w.code,id:w.profile_id,role:w.role,status:workerLoginStatus(w),active:w.employee_active}));
+  for(const a of this.ctx.people||[])if(!linked.has(a.id))rows.push({name:a.name,code:'기존 로그인 계정',id:a.id,role:a.role,status:'기존 계정 유지',active:true});
+  const q=this.search.trim().toLowerCase();
+  this.set(`<div class="card">${this.top()}${notice('작업자 명부 전체를 표시합니다. 사용 중인 작업자는 자동으로 계정을 연결합니다. 구매 결재자는 권한 설정에서 지정하세요.')}${this.syncErrorHtml()}${table(['성명 / 사번','로그인 상태','역할','구매 결재','권한'],rows.filter(r=>!q||[r.name,r.code,r.status].join(' ').toLowerCase().includes(q)).map(r=>{
+   const approval=perms.find(a=>a.profile_id===r.id)?.capabilities?.includes('approve');
+   return [esc(r.name)+'<br>'+esc(r.code),esc(r.status),esc(r.role||'미발급'),approval?'지정':'미지정',r.id?(r.role==='admin'?btn('adminApprover','구매 결재자 지정/해제',r.id):btn('moduleAccess','조회·등록·수정·결재 지정',r.id)):'자동 연결 확인 필요'];
+  }))}</div>`);this.bindSearch();
+ }
+ syncErrorHtml(){return (this.workerSyncErrors||[]).length?notice('자동 연결 미완료: '+this.workerSyncErrors.map(x=>x.name+' — '+x.message).join(' / '),'warning'):'';}
+ async command(action,payload,key){
+  const result=await super.command(action,payload,key);
+  if(this.ctx.profile.role==='admin'&&((action==='save_master'&&payload.kind==='employee')||action==='import_masters')){
+   await this.syncActiveWorkers();await this.load(this.page);
+  }
+  return result;
+ }
  async action(action,id){
+  if(action==='syncWorkers')return this.userAccounts();
+  if(action==='adminApprover'){const old=this.permissions.find(p=>p.profile_id===id)?.capabilities?.includes('approve');return modal('관리자 구매 결재권',notice(old?'구매 결재자 지정을 해제합니다.':'관리자를 구매 결재자 목록에 포함합니다.')+area('reason','변경 사유','','required'),async f=>{await this.rpc('dnm_v49_set_admin_approver',{p_user:id,p_enabled:!old,p_reason:f.reason});await this.access();});}
   if(action==='accountEnroll')return this.accountDialog(this.loginWorkers.find(x=>x.id===id),'provision');
   if(action==='accountReset')return this.accountDialog(this.loginWorkers.find(x=>x.id===id),'reset');
   return super.action(action,id);

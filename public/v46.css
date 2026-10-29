@@ -15,3 +15,9 @@
  #printArea .dnm-doc-lines tr{break-inside:avoid}
  #printArea .dnm-doc-totals{font-size:9pt}
 }
+
+.purchase-suggestions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;padding:12px;background:#f1f6fb;border:1px solid #c4d5e4;border-radius:8px;max-height:220px;overflow:auto}
+.purchase-suggestions[hidden]{display:none}
+.purchase-suggestions>.muted{flex-basis:100%}
+.purchase-suggestions button{background:white;color:#173b55;border:1px solid #9ebbd0;text-align:left;white-space:normal}
+.purchase-suggestions small{display:block;color:#8b5310}

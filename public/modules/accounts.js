@@ -10,9 +10,20 @@ export class AccountService{
   if(!r.ok||!data?.ok){const e=Error(data?.message||(r.status===404?'Supabase Edge Functions의 dnm-accounts 함수가 배포되지 않았습니다.':'계정 요청을 처리하지 못했습니다.'));e.code=data?.code;e.status=r.status;throw e;}
   return data;
  }
- async list(){
-  try{return(await this.api.request('/rest/v1/rpc/dnm_v47_accounts')).data;}
-  catch(e){if(e.status!==404&&e.code!=='HTTP_404')throw e;return(await this.api.request('/rest/v1/rpc/dnm_v43_accounts')).data;}
+ async list(){return(await this.api.request('/rest/v1/rpc/dnm_v49_accounts',{method:'POST',body:{}})).data;}
+ async ensureActive(progress=()=>{}){
+  const data=await this.list();
+  if(data.worker_management!=='4.9.0')throw Error('작업자 자동계정 설치를 확인하세요.');
+  const pending=(data.workers||[]).filter(w=>w.employee_active&&!w.profile_id&&!w.protected);
+  const failures=[];let done=0;
+  for(const w of pending){
+   progress(done,pending.length,w.name);
+   try{await this.request('ensure_worker',{employee_id:w.id});}
+   catch(e){failures.push({name:w.name,message:e.message});if(e.unknown)break;}
+   done++;
+  }
+  progress(done,pending.length,'');
+  return {total:pending.length,done,failures};
  }
  loginName(login_id,password){return this.request('name_login',{login_id,password},false);}
  temporaryName(login_id,password){return this.request('name_temporary_login',{login_id,password},false);}
@@ -28,7 +39,7 @@ export function workerLoginStatus(worker,now=Date.now()){
  if(!worker.profile_id)return '계정 미발급';
  if(worker.state==='pending'){
   const expiry=Date.parse(worker.expires_at||'');
-  if(!Number.isFinite(expiry)||expiry<=now)return '초기번호 만료 · 재발급 필요';
+  if(worker.expires_at!=='infinity'&&(!Number.isFinite(expiry)||expiry<=now))return '초기번호 만료 · 재발급 필요';
   if(!worker.enabled||!worker.profile_active)return '로그인 중지';
   return '첫 비밀번호 설정 대기';
  }

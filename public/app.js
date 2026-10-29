@@ -56,7 +56,8 @@ async function enter(){
  if(!me?.active){let state;try{state=(await api.request('/rest/v1/rpc/dnm_v43_my_account_status')).data;}catch{}await api.logout().catch(()=>{});login(state?.managed?'로그인 사용이 중지되었거나 비밀번호 설정이 필요합니다. 관리자에게 확인하고 초기번호를 받은 경우 1111로 접속하세요.':'계정 활성화 대기 중입니다. 관리자에게 프로그램 내 사용자 등록을 요청하세요.');return;}
  try{context=await new MesService(api).context();if(context?.profile?.id!==me.id||!['4.0.0','4.1.0','4.2.0'].includes(context?.version))throw Error('v4 데이터베이스 응답을 확인하지 못했습니다.');}catch(e){context={profile:me,capabilities:[],schemaError:e.message};}
  mes=new MesController(api,context,(target,detail)=>{navigate(target,detail).catch(fail);});
- tab=context.version==='4.2.0'?firstPage(context):'home';shell({resetPage:true});await load();if(context.version!=='4.2.0')message('업데이트 설치를 확인해야 합니다. 관리자에게 문의하세요.',true);
+ let workerSetupError='';if(me.role==='admin'&&context.worker_management==='4.9.0'){try{const result=await new AccountService(api).ensureActive();if(result.failures.length)workerSetupError='작업자 계정 연결 미완료: '+result.failures.map(x=>x.name+' '+x.message).join(' / ');context=await new MesService(api).context();mes.setContext(context);}catch(e){workerSetupError='작업자 자동 연결 확인 필요: '+e.message;}}
+ tab=context.version==='4.2.0'?firstPage(context):'home';shell({resetPage:true});await load();if(workerSetupError)message(workerSetupError,true);if(context.version!=='4.2.0')message('업데이트 설치를 확인해야 합니다. 관리자에게 문의하세요.',true);
 }
 const menuKey=()=>`dnm-menu:${me?.id||'none'}`;
 function menuState(){try{return restoreMenuState(JSON.parse(localStorage.getItem(menuKey())||'{}'));}catch{return{};}}

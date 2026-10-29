@@ -4,7 +4,7 @@ const scrypt=promisify(scryptCallback);
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-const WORKER_ID=/^[\p{L}\p{N}._ -]{1,80}$/u;
+const WORKER_ID=/^[\p{L}\p{N}._ ()-]{1,80}$/u;
 export function normalizeWorkerId(value){const s=String(value||'').trim();if(!WORKER_ID.test(s))throw new AccountError('작업자 성명(ID)을 확인하세요.');return s;}
 export class AccountError extends Error{constructor(message,status=400,code='ACCOUNT_ERROR'){super(message);this.status=status;this.code=code;}}
 export function normalizeEmail(value){const s=String(value||'').trim().toLowerCase();if(s.length>254||!EMAIL.test(s))throw new AccountError('본인의 정확한 이메일 주소를 입력하세요.');return s;}
@@ -92,9 +92,9 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
     if(!ip)throw new AccountError('접속환경 확인에 실패했습니다. 회사 MES 주소에서 사용하세요.',503,'CLIENT_IP_REQUIRED');
     const allowed=String(env.DNM_INITIAL_LOGIN_ALLOWED_IPS||'').split(',').map(x=>x.trim()).filter(Boolean);
     if(p.action!=='name_login'&&allowed.length&&!allowed.includes(ip))throw new AccountError('초기 비밀번호 설정은 관리자가 허용한 회사 네트워크에서 진행하세요.',403,'NETWORK_RESTRICTED');
-    await b.throttle('ip:'+sha(ip),120,900);
+    await b.throttle('ip:'+sha(ip),ip==='supabase-edge'?1200:120,900);
    }
-   if(p.action==='public_status'){await b.rpc('health');return json({ok:true,version:'4.8.0'});}
+   if(p.action==='public_status'){await b.rpc('health');return json({ok:true,version:'4.9.0'});}
    if(p.action==='name_login'||p.action==='name_temporary_login'){
     const loginId=normalizeWorkerId(p.login_id);
     await b.throttle('worker-id:'+sha(loginId.toLowerCase()),p.action==='name_login'?20:5,900);
@@ -155,7 +155,19 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
     }finally{await b.revokeLocal(s?.access_token);}
    }
    const {user,ctx}=await b.identity(token,true);
-   if(p.action==='status'){await b.rpc('health');return json({ok:true,version:'4.3.0',project_url:b.c.url});}
+   let automaticEnrollment=false;
+   if(p.action==='ensure_worker'){
+    automaticEnrollment=true;
+    if(!UUID.test(p.employee_id||''))throw new AccountError('작업자를 확인하세요.');
+    const list=await b.call('/rest/v1/rpc/dnm_v49_accounts',{method:'POST',body:{},token});
+    if(list.worker_management!=='4.9.0')throw new AccountError('작업자 자동계정 SQL 설치가 필요합니다.',503,'MIGRATION_REQUIRED');
+    const w=(list.workers||[]).find(w=>w.id===p.employee_id);
+    if(!w)throw new AccountError('등록되지 않은 작업자입니다.');
+    if(!w.employee_active||w.protected||w.profile_id)return json({ok:true,skipped:true,employee_id:w.id});
+    p.action='provision';p.version=w.version;p.request_id=crypto.randomUUID();p.email='';
+    p.reason='사용 작업자 자동 로그인 계정 연결';p.confirm_owner=true;
+   }
+   if(p.action==='status'){await b.rpc('health');return json({ok:true,version:'4.9.0',project_url:b.c.url});}
    if(!['provision','reset','disable'].includes(p.action))throw new AccountError('지원하지 않는 계정 작업입니다.');
    if(!UUID.test(p.employee_id||'')||!UUID.test(p.request_id||'')||!Number.isInteger(p.version))throw new AccountError('작업자 목록을 새로고침한 후 다시 선택하세요.');
    const email=p.action==='provision'&&!String(p.email||'').trim() ? 'worker-'+p.employee_id.toLowerCase()+'@dnm.example' : normalizeEmail(p.email);
@@ -164,14 +176,17 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
    await b.throttle('admin:'+user.id,100,900);
    // Resets/disables require the administrator to re-enter their own password.
    if(p.action!=='provision'){const s=await b.reauthenticate(user,p.admin_password);await b.revokeLocal(s.access_token);}
-   const details={actor_id:user.id,employee_id:p.employee_id,request_id:p.request_id,action:p.action,email,version:p.version,reason:p.reason};
+   const details={auto_provision:automaticEnrollment,actor_id:user.id,employee_id:p.employee_id,request_id:p.request_id,action:p.action,email,version:p.version,reason:p.reason};
    const plan=await b.rpc('prepare',details);
    if(plan.done)return json(plan.result);
    try{
     const randomPassword='Dn!'+randomBytes(36).toString('base64url')+'7a';
     let uid=plan.profile_id;
     if(plan.new_user){const created=await b.call('/auth/v1/admin/users',{method:'POST',body:{email:plan.email,password:randomPassword,email_confirm:true,user_metadata:{display_name:plan.name,dnm_employee_id:plan.employee_id}}});uid=created.id||created.user?.id;}
-    else await b.call('/auth/v1/admin/users/'+uid,{method:'PUT',body:{password:randomPassword,email_confirm:true}});
+    else {
+     if(automaticEnrollment){const existing=await b.call('/auth/v1/admin/users/'+uid);if((existing.user_metadata||existing.user?.user_metadata)?.dnm_employee_id!==p.employee_id)throw new AccountError('동일한 내부 ID의 기존 계정이 있습니다. 기존 비밀번호는 변경하지 않았습니다. 관리자 확인이 필요합니다.',409,'ACCOUNT_CONFLICT');}
+     await b.call('/auth/v1/admin/users/'+uid,{method:'PUT',body:{password:randomPassword,email_confirm:true}});
+    }
     if(!UUID.test(uid||''))throw new AccountError('계정 생성 결과를 확인하지 못했습니다.',502);
     const code=await initialHash();
     const result=await b.rpc('finish',{actor_id:user.id,request_id:p.request_id,profile_id:uid,...code});

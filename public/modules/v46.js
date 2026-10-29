@@ -38,54 +38,69 @@ export class V46Controller extends V44Controller{
   $('#v4form').onclick=e=>{const b=e.target.closest('[data-vaction]');if(!b)return;const act=b.dataset.vaction,target=b.dataset.id;b.disabled=true;this.action(act,target).catch(x=>message(x.message)).finally(()=>{if(b.isConnected)b.disabled=false;});};
  }
  async loadCatalog(){
-  if(!this.purchaseCatalog.length){
-   const [m,c]=await Promise.all(['material_master','catalog'].map(k=>this.rec(k).catch(()=>[])));
-   this.purchaseCatalog=catalogIndex(m,c);
-  }
-  return this.purchaseCatalog;
+  const data=(await this.api.request('/rest/v1/rpc/dnm_v49_purchase_catalog',{method:'POST',body:{}})).data;
+  if(!data?.ok||!Array.isArray(data.rows))throw Error('구매 품목 목록을 확인하지 못했습니다.');
+  this.purchaseCatalog=catalogIndex(data.rows,[],true);return this.purchaseCatalog;
  }
  async purchaseForm(seed=null){
+  this.ctx=await this.s.context();
   const people=(this.ctx.people||[]).filter(x=>x.approver&&x.id!==this.ctx.profile.id);
-  const cat=await this.loadCatalog();
+  let cat=[];let lookupError='';try{cat=await this.loadCatalog();}catch(e){lookupError=e.message;}
   let lines=[{item:seed?.title||'',specification:seed?.data?.specification||'',qty:1,unit:seed?.data?.unit||'',unit_price:seed?.data?.unit_price??''}],approvals=[{user_id:'',required:false}];
   const supplier=seed?.data?.supplier||'';
-  const draft=modal('구매의뢰서 작성',`<p class="muted">품명 일부를 입력하면 기존 사용품목을 추천합니다. 신규 품목·규격은 그대로 입력할 수 있습니다.</p>
+  const draft=modal('구매의뢰서 작성',`<p class="muted">품명 일부를 입력하면 기존 사용품목을 추천합니다. 신규 품목·규격은 그대로 입력할 수 있습니다. 미사용·검토대기 자재는 참고 표시되며, 선택해도 기준정보 상태는 바뀌지 않습니다.</p>
   <div class="fields">${input('supplier','공급업체명',supplier,'text','required maxlength="200"')}${input('due_date','입고 희망일','','date')}</div>
-  <h3>구매 품목</h3><div id="purchaseLines"></div><button type="button" id="addPurchaseLine" class="secondary">+ 품목 추가</button>
+  ${lookupError?notice('품목 검색을 불러오지 못했습니다. 직접 입력은 가능합니다. '+lookupError,'warning'):''}<h3>구매 품목</h3><div id="purchaseLines"></div><button type="button" id="addPurchaseLine" class="secondary">+ 품목 추가</button>
   ${select('tax_rate','부가세',[['0.1','과세 10%'],['0','면세/영세 0%']],'0.1')}
-  <h3>순차 결재선</h3><div id="approvalLines"></div><button type="button" id="addApprover" class="secondary">+ 결재자 추가</button>
+  <h3>순차 결재선</h3>${!people.length?notice('선택 가능한 결재자가 없습니다. 관리자에게 구매 결재자 지정을 요청하세요. 본인은 결재자로 선택할 수 없습니다.','warning'):''}<div id="approvalLines"></div><button type="button" id="addApprover" class="secondary">+ 결재자 추가</button>
   ${area('note','구매 목적 / 특기사항')}${notice('결재승인 후 견적의뢰서를 작성하거나 바로 발주서를 발행할 수 있습니다.')}`,
   async(f,k)=>{read();for(const l of lines){l.item=required(l.item,'품명',200);l.specification=String(l.specification||'').trim().slice(0,200);l.unit=required(l.unit,'단위',20);l.qty=qty(l.qty,'수량',false);l.unit_price=money(l.unit_price);}if(approvals.some(a=>!a.user_id))throw Error('결재자를 선택하세요.');if(new Set(approvals.map(a=>a.user_id)).size!==approvals.length)throw Error('결재자 중복입니다.');await this.command('purchase_submit',{data:{...f,lines,tax_rate:Number(f.tax_rate),approvals}},k);},'결재 상신');
   const root=draft.querySelector('.modalbody');
   const read=()=>{lines=all('.purchase-line',root).map(el=>Object.fromEntries(all('[data-field]',el).map(x=>[x.dataset.field,x.value])));approvals=all('.a-line',root).map(el=>({user_id:el.querySelector('select').value,required:el.querySelector('input[type=checkbox]').checked}));};
-  const fillOptions=(i,itemVal,specVal)=>{
+  const fillOptions=(i,itemVal,specVal,field='item')=>{
    const el=$(`#purchaseLine-${i}`,root);if(!el)return;
-   const items=el.querySelector('datalist[data-items]'),specs=el.querySelector('datalist[data-specs]');
-   items.innerHTML=itemSuggestions(cat,itemVal).map(s=>`<option value="${esc(s)}"></option>`).join('');
-   specs.innerHTML=specSuggestions(cat,itemVal).map(s=>`<option value="${esc(s)}"></option>`).join('');
+   const panel=el.querySelector('[data-suggestions]');
+   const names=field==='item'?itemSuggestions(cat,itemVal,40):specSuggestions(cat,itemVal,200).filter(s=>s.toLocaleLowerCase('ko').includes(String(specVal||'').trim().toLocaleLowerCase('ko')));
+   panel.hidden=false;
+   panel.innerHTML=names.length?`<span class="muted">${field==='item'?'품목':'규격'} 검색 결과 · 선택하거나 직접 입력</span>`+names.map((name,n)=>{
+    const matches=cat.filter(x=>field==='item'?x.item===name:x.item.toLocaleLowerCase('ko')===itemVal.trim().toLocaleLowerCase('ko')&&x.specification===name);
+    const ref=matches.length&&matches.every(x=>x.reference);
+    return `<button type="button" data-suggestion-index="${n}">${esc(name)}${ref?' <small>미사용·검토대기 참고</small>':''}</button>`;
+   }).join(''):'<span class="muted">일치하는 목록이 없습니다. 입력한 내용을 그대로 사용할 수 있습니다.</span>';
+   panel.querySelectorAll('[data-suggestion-index]').forEach(b=>b.onclick=()=>{
+    const input=el.querySelector(`[data-field="${field==='item'?'item':'specification'}"]`);
+    input.value=names[Number(b.dataset.suggestionIndex)];input.dispatchEvent(new Event('change',{bubbles:true}));
+    if(field==='item'){const spec=el.querySelector('[data-field="specification"]');spec.focus();fillOptions(i,input.value,spec.value,'specification');}
+    else panel.hidden=true;
+   });
   };
   const render=()=>{
    $('#purchaseLines',root).innerHTML=lines.map((l,i)=>`<div class="purchase-line" id="purchaseLine-${i}">
     <div class="purchase-line-no">${i+1}</div>
-    <label class="purchase-item-name">품명 · 검색 또는 신규 입력<input data-field="item" list="purchaseItem-${i}" value="${esc(l.item)}" required maxlength="200" autocomplete="off" placeholder="품명 일부 입력"><datalist id="purchaseItem-${i}" data-items></datalist></label>
-    <label>규격 / 사양<input data-field="specification" list="purchaseSpec-${i}" value="${esc(l.specification)}" maxlength="200" autocomplete="off" placeholder="선택 또는 입력"><datalist id="purchaseSpec-${i}" data-specs></datalist></label>
+    <label class="purchase-item-name">품명 · 검색 또는 신규 입력<input data-field="item" value="${esc(l.item)}" required maxlength="200" autocomplete="off" placeholder="품명 일부 입력"></label>
+    <label>규격 / 사양<input data-field="specification" value="${esc(l.specification)}" maxlength="200" autocomplete="off" placeholder="선택 또는 입력"></label>
     <label>수량<input data-field="qty" type="number" min="1" step="1" value="${esc(l.qty)}" required></label>
     <label>단위<input data-field="unit" value="${esc(l.unit)}" required maxlength="20"></label>
     <label>예상 단가<input data-field="unit_price" type="number" min="0" step="0.01" value="${esc(l.unit_price)}" required placeholder="확인 후 입력"></label>
-    <button type="button" class="quiet" data-remove-purchase="${i}" title="행 삭제" aria-label="${i+1}행 삭제">×</button></div>`).join('');
+    <button type="button" class="quiet" data-remove-purchase="${i}" title="행 삭제" aria-label="${i+1}행 삭제">×</button><div data-suggestions class="purchase-suggestions" hidden></div></div>`).join('');
    $('#approvalLines',root).innerHTML=approvals.map((a,i)=>`<div class="a-line"><span class="stepnum">${i+1}</span><select required aria-label="${i+1}번째 결재자"><option value="">결재자 선택</option>${people.map(p=>`<option value="${esc(p.id)}" ${p.id===a.user_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select><label class="check"><input type="checkbox" ${a.required?'checked':''}>필수 결재</label><button type="button" class="quiet" data-remove-approver="${i}" aria-label="결재자 삭제">×</button></div>`).join('');
-   lines.forEach((l,i)=>fillOptions(i,l.item,l.specification));
+
    all('.purchase-line',root).forEach((el,i)=>{
     const item=el.querySelector('[data-field="item"]'),spec=el.querySelector('[data-field="specification"]');
-    item.addEventListener('input',()=>fillOptions(i,item.value,spec.value));
+    let lastItem=item.value;
+    item.addEventListener('input',()=>{if(item.value!==lastItem){spec.value='';el.querySelector('[data-field="unit"]').value='';el.querySelector('[data-field="unit_price"]').value='';}fillOptions(i,item.value,spec.value);});
+    item.addEventListener('focus',()=>{if(item.value)fillOptions(i,item.value,spec.value);});
+    spec.addEventListener('focus',()=>fillOptions(i,item.value,spec.value,'specification'));
+    for(const input of [item,spec])input.addEventListener('keydown',e=>{if(e.key==='Escape')el.querySelector('[data-suggestions]').hidden=true;});
     item.addEventListener('change',()=>{
+     if(item.value!==lastItem){spec.value='';el.querySelector('[data-field="unit"]').value='';el.querySelector('[data-field="unit_price"]').value='';lastItem=item.value;}
      const suggestions=specSuggestions(cat,item.value);if(suggestions.length===1&&!spec.value)spec.value=suggestions[0];
-     const found=matchingCatalog(cat,item.value,spec.value);if(found){if(!el.querySelector('[data-field="unit"]').value)el.querySelector('[data-field="unit"]').value=found.unit||'';
+     const found=matchingCatalog(cat,item.value,spec.value);if(found&&!found.reference){if(!el.querySelector('[data-field="unit"]').value)el.querySelector('[data-field="unit"]').value=found.unit||'';
       if(!el.querySelector('[data-field="unit_price"]').value&&found.unit_price!==null)el.querySelector('[data-field="unit_price"]').value=String(found.unit_price);}
      fillOptions(i,item.value,spec.value);
     });
-    spec.addEventListener('input',()=>fillOptions(i,item.value,spec.value));
-    spec.addEventListener('change',()=>{const found=matchingCatalog(cat,item.value,spec.value);if(found){const unit=el.querySelector('[data-field="unit"]');if(!unit.value)unit.value=found.unit||'';const price=el.querySelector('[data-field="unit_price"]');if(!price.value&&found.unit_price!==null)price.value=String(found.unit_price);}});
+    spec.addEventListener('input',()=>{el.querySelector('[data-field="unit_price"]').value='';fillOptions(i,item.value,spec.value,'specification');});
+    spec.addEventListener('change',()=>{const found=matchingCatalog(cat,item.value,spec.value);if(found&&!found.reference){const unit=el.querySelector('[data-field="unit"]');if(!unit.value)unit.value=found.unit||'';const price=el.querySelector('[data-field="unit_price"]');if(!price.value&&found.unit_price!==null)price.value=String(found.unit_price);}});
    });
    all('[data-remove-purchase]',root).forEach(b=>b.onclick=()=>{read();if(lines.length>1)lines.splice(+b.dataset.removePurchase,1);render();});
    all('[data-remove-approver]',root).forEach(b=>b.onclick=()=>{read();if(approvals.length>1)approvals.splice(+b.dataset.removeApprover,1);render();});

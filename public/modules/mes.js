@@ -180,12 +180,12 @@ export class MesController{
   }else{body=`<div class="fields">${input('code',kind==='catalog'?'카탈로그 코드(신규는 자동)':'관리코드 / 품번',r?.code||'','text',`${kind==='catalog'?'':'required'} ${r?'readonly':''} maxlength="400"`)}${input('title','명칭 / 성명',r?.title,'text','required maxlength="200"')}</div>`;
    const defs={equipment:[['department','사업/부서'],['category','설비분류'],['model','모델'],['specification','규격'],['units','대수'],['manufacturer','제조사'],['worker_source','원본 작업자(참고)'],['main_product','주생산품'],['introduced','도입일 원문'],['remarks','비고']],instrument:[['category','분류'],['manufacturer','제조사'],['specification','규격/정밀도'],['introduced','도입일 원문'],['calibration_due','차기 교정일 원문']],employee:[['department','부서'],['position','직책'],['hired','입사일','date']],catalog:[['supplier','공급업체'],['specification','규격'],['unit','단위(확인 후)']],quality_doc:[['document_type','문서구분'],['production_no','생산오더'],['lot','LOT'],['reference','원본 보관 참조번호'],['revision','문서개정']]}[kind]||[];
    body+=`<div class="fields">${defs.map(([k,l,t])=>input(k,l,d[k],t||'text',k==='supplier'?'required':'')).join('')}</div>`;
-   if(kind==='employee')body+=select('profile_id','연결할 로그인 계정',people,d.profile_id);
+   if(kind==='employee')body+=notice('사용 중인 작업자는 저장 후 이름(ID) 로그인 계정이 자동 연결됩니다. 계정을 직접 선택할 필요가 없습니다.');
    if(kind==='equipment')body+=select('manager_id','담당 생산관리자 계정',people,d.manager_id);
    if(kind==='route_template')body+=area('steps','공정별 한 줄: 종류|코드|공정명',(d.steps||[]).map(x=>`${x.kind||'WORK'}|${x.code}|${x.name}`).join('\n'),'required rows="10"')+notice('종류: WORK / MATERIAL / INSPECTION / OUTSOURCE / PACK. 실제 담당자가 공정유형과 순서를 확인하세요.');
    if(kind==='quality_doc')body+=select('state','검토 상태',[['REVIEW','검토대기'],['CONFIRMED','검토확정'],['SUPERSEDED','이전버전']],r?.state||'REVIEW')+area('note','검토 내용',d.note);
   }
-  if(['employee','equipment','assignment'].includes(kind))body+=`<label class="check"><input type="checkbox" name="active" ${d.active?'checked':''}>실제 업무 확인 완료 · 사용 중</label>`;
+  if(['employee','equipment','assignment'].includes(kind))body+=`<label class="check"><input type="checkbox" name="active" ${(d.active||(!r&&kind==='employee'))?'checked':''}>실제 업무 확인 완료 · 사용 중</label>`;
   if(d.source)body+=notice('원본 참조: '+JSON.stringify(d.source));
   modal(KINDS[kind]+' '+(r?'수정':'등록'),body,async(f,k)=>{
    const data={...d,...f};delete data.code;delete data.title;delete data.state;let code=r?.code||f.code,title=f.title||r?.title;
