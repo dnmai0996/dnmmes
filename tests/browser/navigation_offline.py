@@ -51,7 +51,7 @@ def launch_page(page,context):
  html=re.sub(r'<script[^>]*>.*?</script>','',html)
  html=re.sub(r'<link[^>]+>','',html)
  page.set_content(html)
- for f in ['styles.css','v41.css','v42.css','navigation.css','v43.css','v44.css']:page.add_style_tag(content=(BASE/'public'/f).read_text())
+ for f in ['styles.css','v41.css','v42.css','navigation.css','v43.css','v44.css','v46.css']:page.add_style_tag(content=(BASE/'public'/f).read_text())
  modules={}
  image='data:image/png;base64,'+base64.b64encode((BASE/'public/assets/dnm-logo.png').read_bytes()).decode()
  for p in (BASE/'public').rglob('*.js'):

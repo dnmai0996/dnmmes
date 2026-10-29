@@ -31,14 +31,15 @@ export function permissionPreset(name){
  if(name==='master'){for(const m of ['products','materials','employees','processes','equipment','instruments','customers','suppliers','templates','assignments','catalog'])set(m,true);set('archives');set('notes',true);}
  return acl;
 }
-const CREATE={newOrder:'orders',importOrders:'orders',newRouting:'routing',start:'worklogs',manual:'worklogs',newPurchase:'purchase',newPurchaseCatalog:'purchase',receive:'receipts',returnReceipt:'receipts',settle:'settlement',quality:'quality',newQuality:'quality',ship:'quality',customerReturn:'quality',returnCustomer:'quality',newProduct:'products',newPartner:'partners',newTemplate:'templates',newExtra:'kind',newMaster:'kind',importMaster:'kind'};
-const UPDATE={editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
+const CREATE={newOrder:'orders',importOrders:'orders',newRouting:'routing',start:'worklogs',manual:'worklogs',newPurchase:'purchase',newPurchaseCatalog:'purchase',addPayment:'settlement',receive:'receipts',returnReceipt:'receipts',settle:'settlement',quality:'quality',newQuality:'quality',ship:'quality',customerReturn:'quality',returnCustomer:'quality',newProduct:'products',newPartner:'partners',newTemplate:'templates',newExtra:'kind',newMaster:'kind',importMaster:'kind'};
+const UPDATE={editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
 export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employee:'employees',assignment:'assignments',route_template:'templates',route_candidate:'templates',catalog:'catalog',material_master:'materials',process_master:'processes',quality_doc:'documents',products:'products'};
 export function actionRule(action,id,page,record){
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
  if(['templateForOrder','templateForProduct','useCandidate'].includes(action))return {module:'templates',action:'write'};
  if(action==='bulkUseMaster')return {module:'products',action:'write'};
  if(action==='pauseLog')return {module:'worklogs',action:'update'};
+ if(['printPurchaseRequest','sharePurchaseRequest','printPurchaseQuote','sharePurchaseQuote','printPurchaseOrder','sharePurchaseOrder'].includes(action))return {module:'purchase',action:'read'};
  if(action==='voicePanel')return {module:'worklogs',action:'write'};
  if(action==='importOrders')return {module:'orders',action:'write'};
  if(action==='importMaster')return {module:KIND_MODULE[id]||PAGE_MODULE[page]||page,action:'write'};

@@ -22,7 +22,7 @@ export function closeModal(){const d=$('#v4dialog');if(d?.dataset.busy==='true')
 export function onModalClose(f){cleanup=f;}
 export function modal(title,body,onSubmit=null,label='저장'){
  let d=$('#v4dialog');if(!d){d=document.createElement('dialog');d.id='v4dialog';document.body.append(d);}if(!d.dataset.sortAttached){d.addEventListener('click',e=>{const b=e.target.closest('[data-table-sort]');if(b&&d.contains(b)){e.preventDefault();localHeaderSort(b);}});d.dataset.sortAttached='true';}if(d.open)closeModal();d.dataset.busy='false';
- d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.5.1</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
+ d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.6.0</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
  $('#v4cancel').onclick=$('#v4dismiss').onclick=closeModal;d.oncancel=e=>{if(d.dataset.busy==='true'){e.preventDefault();return;}cleanup();cleanup=()=>{};};d.showModal();
  let key=crypto.randomUUID(),frozen=null;
  $('#v4form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요.'),true);

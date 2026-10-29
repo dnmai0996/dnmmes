@@ -5,7 +5,14 @@ const opt=(values,value,empty='선택 안 함')=>`<option value="">${esc(empty)}
 export function mountSteps(id,initial,{equipment=[],employees=[],assignments=[],processes=[]}={}){
  const host=$(id);let steps=structuredClone(initial?.length?initial:[blankStep()]);
  const read=()=>{steps=all('.step-card',host).map(el=>{const prev=steps[Number(el.dataset.step)]||{};const values=Object.fromEntries(all('[data-s]',el).map(e=>[e.dataset.s,e.value]));const employee_ids=all('[data-team]:checked',el).map(e=>e.value);return {...prev,...values,employee_ids,employee_id:employee_ids[0]||''};});return steps;};
- function render(){host.innerHTML=`<datalist id="processSuggestions">${processes.filter(p=>p.data.active!==false).map(p=>`<option value="${esc(p.title)}">${esc(p.code)}</option>`).join('')}</datalist>`+steps.map((s,i)=>{
+ function render(){
+  const activeEq=equipment.filter(e=>e.data?.active===true).length;
+  const inactiveEq=equipment.length-activeEq;
+  const activeWorkers=employees.filter(e=>e.data?.active===true).length;
+  const stateGuide=equipment.length===0?'<div class="notice warning" role="status">조회되는 설비가 없습니다. 「설비·계측관리 → 설비관리」에서 등록 여부를 확인하세요. 등록되어 있는데도 보이지 않는다면 관리자에게 조회 권한 점검을 요청하세요.</div>'
+   :inactiveEq>0?`<div class="notice ${activeEq===0?'warning':'info'}" role="status">설비 ${equipment.length}건 중 사용 중 ${activeEq}건 · 사용중지 ${inactiveEq}건. 설비가 안 보이면 관리자 메뉴 「초기구축·운영 → 기준정보 검토·활성화 → 설비 → 검색결과 일괄 사용전환」에서 실제 사용하는 설비를 활성화하세요.</div>`:'';
+  const workerGuide=employees.length>0&&activeWorkers===0?'<div class="notice warning" role="status">작업자 전원이 사용중지 상태입니다. 관리자 메뉴에서 실제 재직자를 일괄 사용전환하세요. 설비·작업자 사전 연결은 필요하지 않습니다.</div>':'';
+  host.innerHTML=stateGuide+workerGuide+`<datalist id="processSuggestions">${processes.filter(p=>p.data.active!==false).map(p=>`<option value="${esc(p.title)}">${esc(p.code)}</option>`).join('')}</datalist>`+steps.map((s,i)=>{
  const eq=equipment.filter(e=>e.data.active===true || e.id===s.equipment_id);const recommended=new Set(assignments.filter(a=>a.data.active&&a.data.equipment_id===s.equipment_id&&a.data.processes?.includes(s.name)).map(a=>a.data.employee_id));
  // Keep a stale existing value visibly marked; server release revalidates it.
  const chosen=new Set(s.employee_ids?.length?s.employee_ids:(s.employee_id?[s.employee_id]:[]));const emp=employees.filter(e=>e.data.active===true||chosen.has(e.id));

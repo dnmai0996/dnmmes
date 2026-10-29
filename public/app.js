@@ -3,7 +3,7 @@ import {SUPABASE_URL,SUPABASE_PUBLIC_KEY} from './config.js';
 import {VERSION,esc,settings,listQuery,adminListQuery,cleanRecord} from './core.js';
 import {PortalApi} from './api.js';
 import {voiceFor} from './speech.js';
-import {V44Controller as MesController} from './modules/v44.js';
+import {V46Controller as MesController} from './modules/v46.js';
 import {beginActivity} from './modules/activity.js';
 import {showHelp} from './modules/help-v44.js';
 import {AccountService,passwordIssue} from './modules/accounts.js';
