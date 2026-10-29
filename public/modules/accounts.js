@@ -10,7 +10,12 @@ export class AccountService{
   if(!r.ok||!data?.ok){const e=Error(data?.message||(r.status===404?'계정 서버가 배포되지 않았습니다. 전체 패치 파일로 GitHub에서 다시 배포하세요.':'계정 요청을 처리하지 못했습니다.'));e.code=data?.code;e.status=r.status;throw e;}
   return data;
  }
- async list(){return(await this.api.request('/rest/v1/rpc/dnm_v43_accounts')).data;}
+ async list(){
+  try{return(await this.api.request('/rest/v1/rpc/dnm_v47_accounts')).data;}
+  catch(e){if(e.status!==404&&e.code!=='HTTP_404')throw e;return(await this.api.request('/rest/v1/rpc/dnm_v43_accounts')).data;}
+ }
+ loginName(login_id,password){return this.request('name_login',{login_id,password},false);}
+ temporaryName(login_id,password){return this.request('name_temporary_login',{login_id,password},false);}
  temporary(email,password){return this.request('temporary_login',{email,password},false);}
  complete(ticket,password,repeat){return this.request('set_initial_password',{ticket,password,repeat},false);}
 }

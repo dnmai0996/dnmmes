@@ -65,8 +65,8 @@ export class V42Controller extends V41Controller{
   this.setupEquipment=equipment.sort((a,b)=>a.code.localeCompare(b.code,'ko',{numeric:true}));
   const em=this.setupType==='employee',people=this.ctx.people||[],rows=this.filter(em?employees:equipment);
   this.setupRows=this.pagedRecords(rows,r=>['',r.code,r.title,em?(r.data.department||''):(r.data.department+' / '+r.data.category),em?r.data.profile_id:r.data.manager_id]);
-  this.set(`<div class="card">${this.top()}${select('type','설정 종류',[['employee','1. 작업자 ↔ 로그인 계정'],['equipment','2. 설비 담당관리자(선택사항)']],this.setupType,'id="setupType"')}
-  ${notice('설비·작업자는 독립 관리합니다. 고정 연결은 필요 없으며 수주 → Routing Sheet에서 복수배정할 수 있습니다.')}
+  this.set(`<div class="card">${this.top()}${select('type','설정 종류',[['employee','1. 작업자 ↔ 기존 로그인 계정 (필요시)'],['equipment','2. 설비 담당관리자(선택사항)']],this.setupType,'id="setupType"')}
+  ${notice('직원 로그인 ID는 사용자 등록·초기화에서 성명으로 발급됩니다. 이 화면의 기존 계정 연결은 필요한 경우만 사용합니다. 설비·작업자는 고정 연결 없이 Routing에서 배정합니다.')}
   <div class="actions">${btn('setupSelect','이 페이지 전체 선택')}${btn('setupSave','선택행 연결 저장','','primary')}</div>
   ${table(['선택','코드','명칭','현재','연결할 대상'],this.setupRows.map(r=>{const selected=em?r.data.profile_id:r.data.manager_id;
     const candidates=people.filter(x=>em||x.production),matches=em?people.filter(x=>x.name===r.title):[],candidate=selected||(matches.length===1?matches[0].id:'');
