@@ -1,5 +1,5 @@
 import {V421Controller} from './v421.js';
-import {AccountService,ACCOUNT_STATES} from './accounts.js';
+import {AccountService,ACCOUNT_STATES,workerLoginStatus} from './accounts.js';
 import {employeeSort} from './permissions.js';
 import {$,all,esc,input,area,select,table,notice,modal,message,btn,clock} from './ui.js';
 export class V43Controller extends V421Controller{
@@ -22,9 +22,9 @@ export class V43Controller extends V421Controller{
   const data=await this.accounts.list();
   this.loginWorkers=(data.workers||[]).sort((a,b)=>employeeSort({title:a.name,data:a},{title:b.name,data:b}));
   const q=this.search.trim().toLowerCase();
-  const filtered=this.loginWorkers.filter(w=>!q||[w.name,w.login_id,w.code,w.department,w.position,ACCOUNT_STATES[w.state]].some(v=>String(v||'').toLowerCase().includes(q)));
+  const filtered=this.loginWorkers.filter(w=>!q||[w.name,w.login_id,w.code,w.department,w.position,workerLoginStatus(w)].some(v=>String(v||'').toLowerCase().includes(q)));
   const active=this.loginWorkers.filter(w=>w.employee_active).length;
-  const ready=this.loginWorkers.filter(w=>w.employee_active&&w.enabled&&w.state==='ready').length;
+  const ready=this.loginWorkers.filter(w=>w.employee_active&&w.enabled&&w.profile_active&&w.state==='ready').length;
   this.set(`<div class="card"><div class="sectionhead"><div><h2>작업자 사용·로그인 관리</h2><p class="muted">작업자 기준정보와 같은 목록을 사용합니다. 사용·중지 시 계정 접근도 함께 변경됩니다.</p></div><button id="accountHealth" type="button" class="secondary">연결 확인</button></div>
   ${notice('직원 ID는 본인 이름입니다. 신규 직원은 초기번호 1111로 처음 접속하여 본인 비밀번호를 설정합니다. 동명이인은 이름-2로 구분합니다.')}
   ${data.name_login?'':notice('이름 로그인 설정(SQL 18)을 먼저 확인해야 합니다.','warning')}
@@ -36,11 +36,11 @@ export class V43Controller extends V421Controller{
     `<label class="check account-check"><input type="checkbox" data-account-check="${esc(w.id)}" ${w.employee_active?'checked':''} ${protectedUser?'disabled':''} aria-label="${esc(w.name)} 사용/중지"> ${w.employee_active?'사용':'중지'}</label>`,
     `<strong>${esc(w.name)}</strong><br><span class="login-id">${esc(w.login_id||w.name||'미등록')}</span>`,
     esc(w.code)+'<br>'+esc(w.department),
-    `<span class="pill">${esc(w.profile_id?(ACCOUNT_STATES[w.state]||w.state):'계정 미발급')}</span>`,
-    protectedUser?'관리자 계정 보호':(!w.profile_id?btn('accountEnroll','1111 계정 발급',w.id,'primary'):btn('accountReset','1111 초기화',w.id))
+    `<span class="pill">${esc(workerLoginStatus(w))}</span>`,
+    protectedUser?'관리자 계정 보호':(!w.employee_active?'사용 전환 후 발급·초기화':!w.profile_id?btn('accountEnroll','1111 계정 발급',w.id,'primary'):btn('accountReset','1111 초기화',w.id))
    ];
   }))}<div id="v4pager" class="pagination"></div>
-  <p class="muted">퇴직자 사용중지 후에도 작업일보·작업배정 이력은 삭제되지 않습니다. 계정 미발급 직원은 한 번만 발급하면 됩니다.</p></div>`);
+  <p class="muted">퇴직자 사용중지 후에도 작업일보·작업배정 이력은 삭제되지 않습니다. 사용 체크와 계정 발급은 별도입니다. 계정 미발급 직원은 한 번 발급한 뒤 30분 이내에 첫 비밀번호를 설정하세요.</p></div>`);
   this.pageFooter(filtered);
   const searchInput=$('#v4search');if(searchInput)searchInput.placeholder='이름·사번·부서 검색';
   all('[data-account-check]').forEach(c=>c.onchange=()=>{
@@ -59,7 +59,7 @@ export class V43Controller extends V421Controller{
  accountDialog(w,action){
   if(!w||w.protected||w.profile_id===this.ctx.profile.id)throw Error('관리자 계정은 이 기능으로 변경할 수 없습니다.');
   const registering=action==='provision';
-  if(registering&&!w.employee_active)throw Error('먼저 작업자를 사용으로 전환하세요.');
+  if(!w.employee_active)throw Error('먼저 작업자를 사용으로 전환하세요.');
   const title=registering?'이름(ID) 로그인 계정 발급':'초기번호 1111 재발급';
   const dlg=modal(title,`<p><strong>${esc(w.name)}</strong> · ${esc(w.code)}</p>${notice(registering?'본인 이름과 초기번호 1111로 첫 로그인 후 비밀번호를 변경하게 됩니다.':'비밀번호를 잊은 직원에게 초기번호 1111을 다시 발급합니다.')} ${area('reason','변경 사유',registering?'재직자 확인 후 로그인 계정 발급':'비밀번호 분실','required minlength="2" maxlength="1000"')}${registering?'':input('admin_password','관리자 본인의 현재 비밀번호','','password','required autocomplete="current-password"')}<label class="check"><input type="checkbox" name="confirm_owner" required>재직자 본인을 확인했습니다.</label><p class="muted">이메일을 입력할 필요가 없습니다. 초기번호 1111은 30분 동안만 사용 가능하며 최초 개인 비밀번호 설정 후 폐기됩니다.</p>`,async(f,key)=>{
    const result=await this.accounts.request(action,{employee_id:w.id,version:w.version,email:registering?'':w.email,request_id:key,reason:f.reason,admin_password:f.admin_password,confirm_owner:f.confirm_owner==='on'});

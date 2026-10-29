@@ -21,3 +21,17 @@ export class AccountService{
 }
 export function passwordIssue(value){if(typeof value!=='string'||value.length<12||new TextEncoder().encode(value).length>72||!/\p{L}/u.test(value)||!/\d/.test(value))return'새 비밀번호는 문자와 숫자를 포함하여 12자 이상으로 입력하세요. (UTF-8 72바이트 이내)';return'';}
 export const ACCOUNT_STATES={unregistered:'미등록',existing:'기존 계정',provisioning:'계정 처리 중',pending:'첫 비밀번호 설정 대기',changing:'비밀번호 설정 중',ready:'사용 중',disabled:'로그인 중지',error:'초기화 재확인 필요'};
+
+// Display-only status derived from the existing account API. No database writes.
+export function workerLoginStatus(worker,now=Date.now()){
+ if(!worker.employee_active)return '미사용 · 로그인 차단';
+ if(!worker.profile_id)return '계정 미발급';
+ if(worker.state==='pending'){
+  const expiry=Date.parse(worker.expires_at||'');
+  if(!Number.isFinite(expiry)||expiry<=now)return '초기번호 만료 · 재발급 필요';
+  if(!worker.enabled||!worker.profile_active)return '로그인 중지';
+  return '첫 비밀번호 설정 대기';
+ }
+ if(!worker.enabled||!worker.profile_active)return '로그인 중지';
+ return ACCOUNT_STATES[worker.state]||worker.state||'상태 확인 필요';
+}
