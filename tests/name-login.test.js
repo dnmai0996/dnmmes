@@ -62,7 +62,7 @@ test('public worker login is rate-limited and does not allow credential leakage'
 test('frontend names are sent only to same-origin Netlify server and not to Supabase public lookup',async()=>{
  const calls=[];const api={c:{url:PROJECT},session:null,fetcher:async(u,o)=>{calls.push([u,o]);return new Response(JSON.stringify({ok:true,session:{access_token:'worker-token'}}));}};
  await new AccountService(api).loginName('김영희','PRIVATE_PASSWORD');
- assert.equal(calls[0][0],'/.netlify/functions/dnm-accounts');
+ assert.equal(calls[0][0],PROJECT+'/functions/v1/dnm-accounts');
  assert.equal(calls[0][1].credentials,'omit');
  assert.equal(calls[0][1].headers.Authorization,undefined);
  assert.equal(JSON.parse(calls[0][1].body).action,'name_login');

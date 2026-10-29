@@ -40,7 +40,7 @@ with sync_playwright() as pw:
    window.fetch=async(input,opts={})=>{
     const u=new URL(input,'https://dnm-test.netlify.app'),path=u.pathname;
     let data={},status=200;
-    if(path==='/.netlify/functions/dnm-accounts'){
+    if(path==='/functions/v1/dnm-accounts'){
      const b=JSON.parse(opts.body||'{}');window.__requests.push({action:b.action,login_id:b.login_id});
      if(b.action==='name_login')data={ok:true,session:{access_token:'worker-token',refresh_token:'worker-refresh',expires_at:9999999999,user:{id:a.user.id}}};
      else if(b.action==='name_temporary_login')data={ok:true,requires_password_change:true,ticket:'x'.repeat(43),login_id:a.login,expires_at:'2099-01-01'};
@@ -92,7 +92,7 @@ with sync_playwright() as pw:
    else if(path==='/rest/v1/dnm_portal_profiles')data=[a.user];
    else if(path==='/rest/v1/rpc/dnm_v4_context')data=a.context;
    else if(path==='/auth/v1/settings')data={external:{email:true}};
-   else if(path==='/.netlify/functions/dnm-accounts')window.__requests.push(path);
+   else if(path==='/functions/v1/dnm-accounts')window.__requests.push(path);
    return new Response(JSON.stringify(data),{status:200,headers:{'content-range':'0-0/1','Content-Type':'application/json'}});
   };
   const imports={};for(const [name,src] of Object.entries(a.modules))imports[name]=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));

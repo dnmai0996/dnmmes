@@ -21,7 +21,7 @@ const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:
 function configuration(env){
  const url=String(env.DNM_SUPABASE_URL||'').trim().replace(/\/$/,'');
  const key=String(env.DNM_SUPABASE_SECRET_KEY||'').trim();
- if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)throw new AccountError('관리자가 Netlify 환경변수 DNM_SUPABASE_URL과 DNM_SUPABASE_SECRET_KEY를 설정한 뒤 다시 배포해야 합니다.',503,'SETUP_REQUIRED');
+ if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)throw new AccountError('MES 계정 서버에 연결되지 않았습니다. 관리자에게 확인하세요.',503,'SETUP_REQUIRED');
  if(!key.startsWith('sb_secret_')){
   try{const x=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString());if(x.role!=='service_role')throw Error();}
   catch{throw new AccountError('서버 환경변수에는 Publishable/anon 키가 아닌 Secret key 또는 service_role 키가 필요합니다.',503,'SETUP_REQUIRED');}
@@ -84,16 +84,17 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
    let p;try{p=JSON.parse(raw);}catch{throw new AccountError('입력 형식을 확인하세요.');}
    if(!p||Array.isArray(p)||typeof p!=='object')throw new AccountError('입력 형식을 확인하세요.');
    const b=backendFactory?backendFactory():new AccountBackend(env,fetcher);
-   if(p.project_url&&String(p.project_url).replace(/\/$/,'')!==b.c.url)throw new AccountError('Netlify 서버 URL과 public/config.js의 Supabase 프로젝트가 다릅니다.',503,'PROJECT_MISMATCH');
+   if(p.project_url&&String(p.project_url).replace(/\/$/,'')!==b.c.url)throw new AccountError('프로그램과 계정 서버의 Supabase 프로젝트가 다릅니다.',503,'PROJECT_MISMATCH');
    const token=request.headers.get('authorization')?.replace(/^Bearer\s+/i,'');
-   const publicAction=['temporary_login','name_temporary_login','name_login','set_initial_password'].includes(p.action);
+   const publicAction=['temporary_login','name_temporary_login','name_login','set_initial_password','public_status'].includes(p.action);
    if(publicAction){
     const ip=context.ip; // trusted Netlify context, never x-forwarded-for from the user
-    if(!ip)throw new AccountError('접속환경 확인에 실패했습니다. 배포된 Netlify 주소에서 사용하세요.',503,'CLIENT_IP_REQUIRED');
+    if(!ip)throw new AccountError('접속환경 확인에 실패했습니다. 회사 MES 주소에서 사용하세요.',503,'CLIENT_IP_REQUIRED');
     const allowed=String(env.DNM_INITIAL_LOGIN_ALLOWED_IPS||'').split(',').map(x=>x.trim()).filter(Boolean);
     if(p.action!=='name_login'&&allowed.length&&!allowed.includes(ip))throw new AccountError('초기 비밀번호 설정은 관리자가 허용한 회사 네트워크에서 진행하세요.',403,'NETWORK_RESTRICTED');
     await b.throttle('ip:'+sha(ip),120,900);
    }
+   if(p.action==='public_status'){await b.rpc('health');return json({ok:true,version:'4.8.0'});}
    if(p.action==='name_login'||p.action==='name_temporary_login'){
     const loginId=normalizeWorkerId(p.login_id);
     await b.throttle('worker-id:'+sha(loginId.toLowerCase()),p.action==='name_login'?20:5,900);
@@ -157,8 +158,8 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
    if(p.action==='status'){await b.rpc('health');return json({ok:true,version:'4.3.0',project_url:b.c.url});}
    if(!['provision','reset','disable'].includes(p.action))throw new AccountError('지원하지 않는 계정 작업입니다.');
    if(!UUID.test(p.employee_id||'')||!UUID.test(p.request_id||'')||!Number.isInteger(p.version))throw new AccountError('작업자 목록을 새로고침한 후 다시 선택하세요.');
-   const email=normalizeEmail(p.email);
-   if(p.confirm_owner!==true)throw new AccountError('실제 재직자와 이메일 소유자 확인란을 선택하세요.');
+   const email=p.action==='provision'&&!String(p.email||'').trim() ? 'worker-'+p.employee_id.toLowerCase()+'@dnm.example' : normalizeEmail(p.email);
+   if(p.confirm_owner!==true)throw new AccountError('실제 작업자 재직상태를 확인하세요.');
    if(typeof p.reason!=='string'||p.reason.trim().length<2||p.reason.length>1000)throw new AccountError('변경 사유를 입력하세요.');
    await b.throttle('admin:'+user.id,100,900);
    // Resets/disables require the administrator to re-enter their own password.
@@ -175,7 +176,7 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
     const code=await initialHash();
     const result=await b.rpc('finish',{actor_id:user.id,request_id:p.request_id,profile_id:uid,...code});
     try{await b.rpc('clear_rate',{email_hash:sha(email)});}catch{/* account creation succeeded; optional counter cleanup must not make it fail */}
-    return json({...result,message:'계정이 준비되었습니다. 위 목록에 표시된 성명(ID)과 초기번호 1111을 직원에게 안내하세요.'});
+    return json({...result,message:'계정이 준비되었습니다. 본인 이름(ID)과 초기번호 1111로 로그인하도록 안내하세요.'});
    }catch(e){try{await b.rpc('failed',{actor_id:user.id,request_id:p.request_id});}catch{}throw new AccountError(e.message+' 계정이 부분 생성되었을 수 있습니다. 목록 새로고침 후 상태를 확인하고 다시 등록·초기화하세요.',e.status||503,'ACCOUNT_OPERATION_FAILED');}
   }catch(e){
    return json({ok:false,code:e instanceof AccountError?e.code:'ACCOUNT_INTERNAL_ERROR',message:e instanceof AccountError?e.message:'계정 처리 중 오류가 발생했습니다. 관리자에게 확인하세요.'},e instanceof AccountError?e.status:500);

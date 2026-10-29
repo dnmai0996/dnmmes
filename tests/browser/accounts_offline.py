@@ -32,18 +32,19 @@ def launch(page,who='admin'):
   if(f.who!=='login')sessionStorage.setItem('dnm-portal-session:'+f.origin,JSON.stringify(session()));
   window.fetch=async(path,o={})=>{
    const u=new URL(path,'https://dnm-test.netlify.app'),q=u.searchParams;let data=[],status=200;const h={'Content-Type':'application/json'};
-   if(u.pathname==='/.netlify/functions/dnm-accounts'){
+   if(u.pathname==='/functions/v1/dnm-accounts'){
     const b=JSON.parse(o.body);window.__calls.push(b);
     if(window.__forceError){status=503;data={ok:false,message:'시험용 설정 실패'};}
     else if(b.action==='status')data={ok:true};
-    else if(b.action==='temporary_login')data={ok:true,requires_password_change:true,email:b.email,ticket:'A'.repeat(43),expires_at:'2099-01-01'};
+    else if(b.action==='name_temporary_login')data={ok:true,requires_password_change:true,login_id:b.login_id,ticket:'A'.repeat(43),expires_at:'2099-01-01'};
     else if(b.action==='set_initial_password')data={ok:true};
     else if(['provision','reset','disable'].includes(b.action)){
-     f.worker.profile_id=f.profiles[1].id;f.worker.email=b.email;f.worker.enabled=b.action!=='disable';f.worker.state=b.action==='disable'?'disabled':'pending';f.worker.expires_at='2099-01-01T00:00:00Z';
+     f.worker.profile_id=f.profiles[1].id;f.worker.email='worker-'+f.worker.id+'@dnm.example';f.worker.enabled=b.action!=='disable';f.worker.state=b.action==='disable'?'disabled':'pending';f.worker.expires_at='2099-01-01T00:00:00Z';
      data={ok:true,message:'시험용 계정 처리 완료',state:f.worker.state};
     }else if(b.action==='change_password')data={ok:true};
-   }else if(u.pathname==='/rest/v1/rpc/dnm_v43_accounts')data={version:'4.3.0',workers:[f.worker]};
+   }else if(['/rest/v1/rpc/dnm_v47_accounts','/rest/v1/rpc/dnm_v43_accounts'].includes(u.pathname))data={version:'4.3.0',name_login:'4.7.0',workers:[f.worker]};
    else if(u.pathname==='/rest/v1/rpc/dnm_v4_context')data=f.ctx;
+   else if(u.pathname==='/rest/v1/rpc/dnm_v48_set_worker_active'){const x=JSON.parse(o.body);window.__calls.push({action:'worker_state',...x});f.worker.employee_active=x.p_active;f.worker.enabled=x.p_active;data={ok:true};}
    else if(u.pathname==='/rest/v1/dnm_portal_profiles'){data=f.profiles;if(q.has('id'))data=data.filter(x=>x.id===q.get('id').slice(3));h['content-range']=`0-${data.length-1}/${data.length}`;}
    else if(u.pathname==='/rest/v1/dnm_v4_records'){data=[];h['content-range']='0-0/0';}
    else if(u.pathname.startsWith('/rest/v1/dnm_portal_')){data=[];h['content-range']='0-0/0';}
@@ -65,25 +66,25 @@ with sync_playwright() as pw:
  try:
   p=b.new_page(viewport={'width':1440,'height':960});launch(p);accounts(p)
   check('admin worker account checkbox present',p.locator('[data-account-check]').count()==1)
-  check('existing administrator role management retained',p.locator('[data-vaction=accountRole]').count()==1)
-  p.click('#accountHealth');p.wait_for_function("()=>document.querySelector('#accountServiceState').textContent.includes('사용자 등록 기능에 연결')")
+  check('one worker management table',p.locator('[data-vaction=accountRole]').count()==0)
+  p.click('#accountHealth');p.wait_for_function("()=>document.querySelector('#accountServiceState').textContent.includes('직원 로그인 서버에 연결')")
   check('backend health result rendered')
   p.screenshot(path=str(OUT/'admin-worker-accounts.png'),full_page=False)
-  p.click('[data-account-check]');p.wait_for_selector('#v4dialog[open]');check('registration dialog has login checkbox',p.locator('[name=login_user]').is_checked())
-  p.fill('#v4dialog [name=email]','worker@example.invalid');p.check('#v4dialog [name=confirm_owner]');p.click('#v4submit');p.wait_for_function("()=>!document.querySelector('#v4dialog').open")
-  check('first registration uses email with existing worker ID',p.evaluate("__calls.some(x=>x.action==='provision'&&x.employee_id==='"+E+"'&&x.email==='worker@example.invalid')"))
+  p.click('[data-vaction=accountEnroll]');p.wait_for_selector('#v4dialog[open]');check('no email required',p.locator('[name=email]').count()==0)
+  p.check('#v4dialog [name=confirm_owner]');p.click('#v4submit');p.wait_for_function("()=>!document.querySelector('#v4dialog').open")
+  check('registration linked by worker ID',p.evaluate("__calls.some(x=>x.action==='provision'&&x.employee_id==='"+E+"'&&x.email==='')"))
   check('pending password state shown','첫 비밀번호 설정 대기' in p.locator('#content').inner_text())
   p.click('[data-vaction=accountReset]');p.wait_for_selector('#v4dialog[open]');check('reset asks administrator current password',p.locator('[name=admin_password]').count()==1)
-  check('linked email is readonly',p.locator('[name=email]').get_attribute('readonly') is not None)
+  check('reset needs no email input',p.locator('[name=email]').count()==0)
   p.fill('[name=reason]','본인 확인 후 초기화');p.fill('[name=admin_password]','Admin-Example-2026!');p.check('[name=confirm_owner]');p.click('#v4submit');p.wait_for_function("()=>!document.querySelector('#v4dialog').open")
   check('reset is explicit server action',p.evaluate("__calls.some(x=>x.action==='reset')"))
-  p.click('[data-account-check]');p.wait_for_selector('#v4dialog[open]');check('disable confirmation preserves work data','삭제하지 않습니다' in p.locator('#v4dialog').inner_text())
-  p.fill('[name=reason]','사용 중지 승인');p.fill('[name=admin_password]','Admin-Example-2026!');p.check('[name=confirm_owner]');p.click('#v4submit');p.wait_for_function("()=>!document.querySelector('#v4dialog').open")
-  check('account disable not deletion',p.evaluate("__calls.some(x=>x.action==='disable')") and '로그인 중지' in p.locator('#content').inner_text())
+  p.click('[data-account-check]');p.wait_for_selector('#v4dialog[open]');check('disable confirmation preserves work data','보존' in p.locator('#v4dialog').inner_text())
+  p.fill('[name=reason]','사용 중지 승인');p.click('#v4submit');p.wait_for_function("()=>!document.querySelector('#v4dialog').open")
+  check('account disable not deletion',p.evaluate("__calls.some(x=>x.action==='worker_state'&&x.p_active===false)"))
   p.click('#password');p.wait_for_selector('#editor[open]');p.fill('#editor [name=current]','Current123456!');p.fill('#editor [name=next]','New-Password-2026!');p.fill('#editor [name=repeat]','New-Password-2026!');p.click('#save');p.wait_for_selector('#loginForm');check('self-change returns to login','비밀번호가 변경' in p.locator('#message').inner_text());p.close()
   p=b.new_page(viewport={'width':1440,'height':900});launch(p,'worker');p.wait_for_selector('#title');check('worker cannot see account management menu',p.locator('[data-tab=profiles]').count()==0);check('worker has password change button',p.locator('#password').count()==1);p.close()
   for width in [320,360,390]:
-   p=b.new_page(viewport={'width':width,'height':860});launch(p,'login');p.wait_for_selector('#loginForm');p.fill('#loginForm [name=email]','worker@example.invalid');p.fill('#loginForm [name=password]','1111');p.click('#loginForm button');p.wait_for_selector('#initialPasswordForm')
+   p=b.new_page(viewport={'width':width,'height':860});launch(p,'login');p.wait_for_selector('#loginForm');p.fill('#loginForm [name=login_id]','검수 작업자');p.fill('#loginForm [name=password]','1111');p.click('#loginForm button');p.wait_for_selector('#initialPasswordForm')
    check(f'{width}: no business nav before personal password',p.locator('#sideMenu').count()==0)
    check(f'{width}: bootstrap flow stores no session',p.evaluate('sessionStorage.getItem("dnm-portal-session:"+__f.origin)') is None)
    check(f'{width}: no horizontal page overflow',p.evaluate('document.documentElement.scrollWidth<=innerWidth+1'))
@@ -92,7 +93,7 @@ with sync_playwright() as pw:
    if width==360:p.screenshot(path=str(OUT/'password-mismatch-mobile-360.png'),full_page=False)
    p.fill('#initialPasswordForm [name=repeat]','New-Password-2026!');p.click('#initialPasswordForm button[type=submit]');p.wait_for_selector('#loginForm')
    check(f'{width}: setup success requires new personal login','비밀번호를 설정했습니다' in p.locator('#message').inner_text())
-   check(f'{width}: initialization never sends 1111 to Auth token endpoint',p.evaluate('__calls.filter(x=>x.action==="temporary_login").length')==1)
+   check(f'{width}: initialization never sends 1111 to Auth token endpoint',p.evaluate('__calls.filter(x=>x.action==="name_temporary_login").length')==1)
    p.close()
   p=b.new_page(viewport={'width':360,'height':860});launch(p);accounts(p);check('mobile account list page has no horizontal overflow',p.evaluate('document.documentElement.scrollWidth<=innerWidth+1'));p.screenshot(path=str(OUT/'admin-accounts-mobile-360.png'),full_page=False);p.close()
   check('no browser JavaScript errors',not errors)

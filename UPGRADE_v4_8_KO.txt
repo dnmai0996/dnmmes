@@ -1,0 +1,23 @@
+(주)디엔엠 스마트 MES v4.8 — 최소 적용 순서
+
+1. 현재 업무자료 백업 및 v4.7 프로그램 ZIP 보관.
+2. Supabase > SQL Editor에서 database/20_upgrade_v4_8_worker_login.sql 1회 실행.
+   ※ v4.7의 SQL 18이 적용되어 있어야 합니다. 이전 SQL 재실행 금지.
+3. Supabase > Edge Functions > Deploy a new function > Via Editor:
+   함수 이름 dnm-accounts, 소스 supabase/functions/dnm-accounts/index.ts 전체 붙여넣어 Deploy.
+   중요: 함수의 "Verify JWT"(JWT 검증) 옵션을 꺼야 초기번호 로그인이 가능합니다.
+   이 함수는 스스로 사용자 ID와 비밀번호를 확인하며 권한 없는 계정 생성은 차단합니다.
+4. v4.8 패치를 기존 GitHub 저장소에 병합 → Commit → Push → Netlify 배포 완료.
+   기존 public/config.js 수정·삭제 금지. Netlify 환경변수 신규 등록 필요 없음.
+5. 관리자 이메일 로그인 → 작업자 사용·로그인 관리 → 재직자 확인 →
+   계정 미발급 1명에 '1111 계정 발급' → 직원 이름(ID)+1111 로그인 시험.
+   직원은 30분 이내에 새 개인 비밀번호를 설정해야 합니다.
+
+작업자 사용/중지는 한 목록에서 관리하며, 사용중지 이후에도 기존 실적은 삭제되지 않습니다.
+고급 기술용 설명은 Supabase와 설치 안내서에만 있으며 일반 업무 화면에는 표시되지 않습니다.
+
+[주의]
+- Netlify 주소가 dnmmes.netlify.app이 아니라면 Supabase 서버 소스의 ALLOWED_ORIGINS에 실제 주소 추가.
+- 이미 적용한 SQL 20을 반복 실행하지 마세요.
+- 실제 Supabase Edge/로그인/권한/DB 동기화는 시험 계정으로 검증 후 전체 직원에게 적용.
+- 서비스 계정 비밀키를 public/config.js, GitHub, 채팅에 절대로 붙여넣지 마세요.

@@ -1,13 +1,13 @@
-// Frontend carries user JWTs only. Service-role/secret keys stay in Netlify Functions.
+// Frontend carries user JWTs only. Service-role/secret keys stay in Supabase Edge Functions.
 export class AccountService{
  constructor(api){this.api=api;}
  async request(action,body={},authenticated=true){
   if(authenticated){if(!this.api.session?.access_token)throw Error('로그인이 필요합니다.');if(this.api.session.expires_at<Date.now()/1000+45)await this.api.refresh();}
-  const headers={'Content-Type':'application/json'};if(authenticated)headers.Authorization='Bearer '+this.api.session.access_token;
+  const headers={'Content-Type':'application/json',apikey:this.api.c.key};if(authenticated)headers.Authorization='Bearer '+this.api.session.access_token;
   let r,data;
-  try{r=await this.api.fetcher('/.netlify/functions/dnm-accounts',{method:'POST',headers,credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(55000),body:JSON.stringify({action,project_url:this.api.c.url,...body})});const text=await r.text();try{data=JSON.parse(text);}catch{throw Error('NOT_JSON');}}
-  catch{const e=Error('계정 처리 응답을 확인하지 못했습니다. Netlify Functions 배포·설정을 확인하고 사용자 목록을 새로고침하세요.');e.unknown=authenticated&&action!=='status';throw e;}
-  if(!r.ok||!data?.ok){const e=Error(data?.message||(r.status===404?'계정 서버가 배포되지 않았습니다. 전체 패치 파일로 GitHub에서 다시 배포하세요.':'계정 요청을 처리하지 못했습니다.'));e.code=data?.code;e.status=r.status;throw e;}
+  try{r=await this.api.fetcher(this.api.c.url+'/functions/v1/dnm-accounts',{method:'POST',headers,credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(55000),body:JSON.stringify({action,project_url:this.api.c.url,...body})});const text=await r.text();try{data=JSON.parse(text);}catch{throw Error('NOT_JSON');}}
+  catch{const e=Error('계정 처리 응답을 확인하지 못했습니다. Supabase dnm-accounts 함수 배포를 확인하고 사용자 목록을 새로고침하세요.');e.unknown=authenticated&&action!=='status';throw e;}
+  if(!r.ok||!data?.ok){const e=Error(data?.message||(r.status===404?'Supabase Edge Functions의 dnm-accounts 함수가 배포되지 않았습니다.':'계정 요청을 처리하지 못했습니다.'));e.code=data?.code;e.status=r.status;throw e;}
   return data;
  }
  async list(){
