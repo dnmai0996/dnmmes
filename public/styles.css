@@ -10,3 +10,24 @@ html,body{max-width:100%;overflow-x:hidden}button{transition:background .15s,box
 .vtoolbar form button { white-space:nowrap; flex-shrink:0; min-width:64px; }
 .resource-cards { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px; }
 .supplier-filter { max-width:350px;margin:8px 0 16px; }
+
+/* DNM v4.5: optional multi-worker routing selection */
+.team-picker{margin-top:.35rem;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:.4rem .65rem;min-width:0}
+.team-picker summary{cursor:pointer;min-height:36px;line-height:36px;overflow-wrap:anywhere;word-break:keep-all}
+.team-list{max-height:225px;overflow:auto;padding:.4rem;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem}
+.team-row{display:flex!important;align-items:center;gap:.5rem;padding:.45rem;border-radius:8px;border:1px solid #e5e7eb;font-size:.88rem;line-height:1.35;min-width:0}
+.team-row input[type=checkbox]{width:20px!important;height:20px!important;flex:none;margin:0}
+@media(max-width:560px){.team-list{grid-template-columns:1fr}.team-row{min-height:45px}}
+
+/* DNM v4.5.1: column sorting. Only the header button changes sorting; data cells remain read-only. */
+.table-sort-button,.table-sort-button:not(.secondary):not(.quiet){
+ appearance:none!important;display:inline-flex;align-items:center;justify-content:flex-start;
+ gap:9px;width:100%;min-height:36px;padding:4px 2px;border:0;border-radius:5px;
+ background:transparent!important;color:inherit!important;font:inherit;text-align:left;
+ white-space:nowrap;box-shadow:none!important;cursor:pointer;
+}
+.table-sort-button:hover,.table-sort-button:focus-visible{background:#dceaf4!important;color:#164e77!important}
+.sort-indicator{font-weight:800;color:#577b9c;font-size:11px;min-width:13px}
+th[aria-sort="ascending"],th[aria-sort="descending"]{background:#e0ecfa;color:#14537f}
+th[aria-sort="ascending"] .sort-indicator,th[aria-sort="descending"] .sort-indicator{color:#1463a0}
+@media print {.table-sort-button,.table-sort-button:not(.secondary):not(.quiet){padding:0;min-height:0;background:transparent!important}.sort-indicator{display:none}}

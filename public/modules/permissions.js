@@ -3,13 +3,13 @@ export const MODULES={dashboard:'작업진척 대시보드',orders:'고객수주
 // Dashboard is a standalone entry; group visibility still uses the existing database ACL.
 export const TOP_PAGES=['dashboard'];
 export const GROUPS=[
- ['수주관리',['orders','sourceOrders','templates','routeCandidates','routingSetup','routing']],
+ ['수주관리',['orders','routing']],
  ['생산관리',['instructions','workCards','touchWork','voiceWork','worklogs']],
  ['구매관리',['purchase','receipts','settlement']],
  ['품질관리',['quality','documents']],
  ['설비·계측관리',['equipment','instruments']],
- ['기준정보',['products','materials','employees','processes','customers','suppliers','assignments','catalog']],
- ['초기구축·운영',['seedData','workforceSetup','sourceReview','archives','notes','profiles','access','audit','backup','home']]
+ ['기준정보',['products','materials','employees','processes','customers','suppliers','templates','catalog']],
+ ['초기구축·운영',['seedData','workforceSetup','sourceReview','sourceOrders','routeCandidates','archives','notes','profiles','access','audit','backup','home']]
 ];
 export const PAGE_MODULE={instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
 export const ADMIN_PAGES=new Set(['seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
@@ -37,6 +37,8 @@ export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employe
 export function actionRule(action,id,page,record){
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
  if(['templateForOrder','templateForProduct','useCandidate'].includes(action))return {module:'templates',action:'write'};
+ if(action==='bulkUseMaster')return {module:'products',action:'write'};
+ if(action==='pauseLog')return {module:'worklogs',action:'update'};
  if(action==='voicePanel')return {module:'worklogs',action:'write'};
  if(action==='importOrders')return {module:'orders',action:'write'};
  if(action==='importMaster')return {module:KIND_MODULE[id]||PAGE_MODULE[page]||page,action:'write'};

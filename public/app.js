@@ -12,12 +12,14 @@ import {MesService} from './modules/service.js';
 import {NAV_LABELS as labels,renderNavigation,breadcrumbMarkup,firstPage,restoreMenuState,keepSelectedVisible} from './modules/navigation.js';
 import {can} from './modules/domain.js';
 import {modal as helpModal} from './modules/ui.js';
+import {canSortHeader,indicateSort} from './modules/table-sort.js';
 const $=s=>document.querySelector(s),all=(s,root=document)=>[...root.querySelectorAll(s)];
 
 const legacyTabs=['home','notes','audit'];
 let mes,context;
 const roleLabel={admin:'관리자',member:'담당자',viewer:'조회자'};
 let api,me,tab='home',page=1,query='',status='active',generation=0,stopVoice=()=>{};
+const adminColumnSort={};const auditSortFields=['created_at','entity','action','actor_id','record_id'];
 const clock=v=>new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});
 function message(text,error=false){if(error)text=userMessage(text);const box=$('#editor').open?$('#dialogMessage'):$('#message');if(box){box.hidden=false;box.className='message'+(error?' error':'')+($('#editor').open?' dialog-message':'');box.textContent=text;}}
 function fail(e){const text=e?.message||'처리 결과를 확인하지 못했습니다. 다시 조회하세요.';message(text,true);if(api&&!api.session)login(text);}
@@ -124,7 +126,7 @@ function shell({resetPage=false}={}){
 
 const field=(name,label,value='',type='text',attrs='')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
 const empty='<div class="empty">등록된 자료가 없습니다.</div>';
-function grid(headers,rows){return rows.length?`<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td class="wrap">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:empty;}
+function grid(headers,rows){return rows.length?`<div class="table-wrap"><table><thead><tr>${headers.map((h,i)=>`<th>${canSortHeader(h)?`<button type="button" class="table-sort-button" data-table-sort="${i}" aria-label="${esc(h)} 기준 정렬">${esc(h)} <span class="sort-indicator" aria-hidden="true">⇅</span></button>`:esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td class="wrap">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:empty;}
 function editable(action='update'){return permit(context,tab,action);}
 async function load(){
  const ticket=++generation,kind=tab;$('#connection').textContent='조회 중…';
@@ -136,6 +138,7 @@ async function load(){
    $('#content').innerHTML=`<div class="metrics">${counts.map((r,i)=>`<div class="card metric"><span>${['제품','거래처','공유메모'][i]}</span><b>${r.total||0}</b></div>`).join('')}</div><div class="card"><h2>한 곳에 저장하고, 함께 확인합니다.</h2><p class="muted">자료는 회사 업무시스템에 함께 저장됩니다. 다른 기기의 변경은 새로고침하거나 잠시 기다리면 확인할 수 있습니다.</p><div class="flow">품목 기준정보 · 제품코드, 품명, Project, 단위<br>거래처 · 고객사와 공급업체 연락정보<br>공유메모 · 음성 또는 직접 입력 후 확인·저장</div></div><div class="card"><h2>연결 상태</h2><p>업무시스템에 연결되어 있습니다.</p><small>음성 입력은 지원 브라우저에서 사용합니다. 인식 결과는 저장 전에 수정할 수 있습니다.</small></div>`;
   }else{
    let q=['products','partners','notes'].includes(kind)?listQuery(kind,page,query,status):adminListQuery(kind,page,query);
+   if(kind==='audit'&&adminColumnSort.audit){const x=new URLSearchParams(q),sort=adminColumnSort.audit;x.set('order',auditSortFields[sort.col]+'.'+sort.dir);q=x.toString();}
    const {data:rows,total}=await api.rows(kind,q);if(ticket!==generation)return;
    const search=['products','partners','notes','profiles','audit'].includes(kind),canAdd=['products','partners','notes'].includes(kind)&&editable('create');
    let html=search?`<form id="search" class="toolbar"><label class="sr" for="searchText">검색</label><input id="searchText" placeholder="${kind==='notes'?'제목 또는 내용':kind==='profiles'?'성명·이메일·역할':kind==='audit'?'대상·작업 유형':'코드 또는 명칭'} 검색" value="${esc(query)}">${['products','partners'].includes(kind)?`<select id="status" aria-label="사용 상태"><option value="active" ${status==='active'?'selected':''}>사용 중</option><option value="inactive" ${status==='inactive'?'selected':''}>사용 중지</option><option value="all" ${status==='all'?'selected':''}>전체</option></select>`:''}<button>검색</button>${canAdd?'<button id="new" type="button" class="secondary">신규 등록</button>':''}</form>`:'';
@@ -146,6 +149,8 @@ async function load(){
    if(kind==='audit')html+=grid(['변경 시각','대상','작업','작성자 ID','자료 ID'],rows.map(r=>[clock(r.created_at),esc(r.entity),esc(r.action),esc(r.actor_id||'DB 관리자'),esc(r.record_id)]));
    html+=`<div class="pagination"><button id="prev" class="secondary" ${page===1?'disabled':''}>이전</button><span>${page} / ${Math.max(1,Math.ceil(total/25))} · 총 ${total}건</span><button id="next" class="secondary" ${page*25>=total?'disabled':''}>다음</button></div>`;
    $('#content').innerHTML='<div class="card">'+html+'</div>';
+   const sort=adminColumnSort[kind];if(sort)indicateSort($('#content table'),sort.col,sort.dir);
+   $('#content').onclick=e=>{const b=e.target.closest('[data-table-sort]');if(!b||kind!=='audit')return;e.preventDefault();const col=Number(b.dataset.tableSort),prev=adminColumnSort.audit;adminColumnSort.audit={col,dir:prev?.col===col&&prev.dir==='asc'?'desc':'asc'};page=1;load().catch(fail);};
    $('#search')?.addEventListener('submit',e=>{e.preventDefault();query=$('#searchText').value.trim();status=$('#status')?.value||'all';page=1;load().catch(fail);});
    if(kind==='products'&&can(context,'master')){$('#new')?.insertAdjacentHTML('afterend','<button type="button" id="importProducts" class="secondary">품목 Excel 가져오기</button>');$('#importProducts')?.addEventListener('click',()=>mes.importForm('products'));}
    if($('#searchText')){let delay;$('#searchText').oninput=e=>{clearTimeout(delay);const text=e.target.value,pos=e.target.selectionStart;delay=setTimeout(async()=>{query=text;page=1;try{await load();const box=$('#searchText');if(box&&box.value===text){box.focus();box.setSelectionRange(pos,pos);}}catch(x){fail(x);}},320);};}

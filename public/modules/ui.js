@@ -2,6 +2,7 @@ import {userMessage} from './error-info.js';
 import {beginActivity} from './activity.js';
 import {esc} from '../core.js';
 import {STATUS,csv} from './domain.js';
+import {canSortHeader,localHeaderSort} from './table-sort.js';
 export {esc};
 export const $=(s,root=document)=>root.querySelector(s),all=(s,root=document)=>[...root.querySelectorAll(s)];
 export const num=x=>Number(x||0).toLocaleString('ko-KR');
@@ -11,7 +12,7 @@ export const btn=(action,label,id='',cls='secondary')=>`<button type="button" cl
 export const input=(name,label,value='',type='text',extra='')=>`<label>${esc(label)}<input name="${esc(name)}" type="${type}" value="${esc(value)}" ${extra}></label>`;
 export const area=(name,label,value='',extra='')=>`<label>${esc(label)}<textarea name="${esc(name)}" ${extra}>${esc(value)}</textarea></label>`;
 export const select=(name,label,options,value='',extra='')=>`<label>${esc(label)}<select name="${esc(name)}" ${extra}>${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
-export const table=(heads,rows)=>`<div class="table-wrap"><table><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(x=>`<td>${x??''}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${heads.length}" class="empty">자료가 없습니다. 신규 등록 또는 자료 가져오기를 진행하세요.</td></tr>`}</tbody></table></div>`;
+export const table=(heads,rows)=>`<div class="table-wrap"><table><thead><tr>${heads.map((h,i)=>`<th>${canSortHeader(h)?`<button type="button" class="table-sort-button" data-table-sort="${i}" aria-label="${esc(h)} 기준 정렬">${esc(h)} <span class="sort-indicator" aria-hidden="true">⇅</span></button>`:esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(x=>`<td>${x??''}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${heads.length}" class="empty">자료가 없습니다. 신규 등록 또는 자료 가져오기를 진행하세요.</td></tr>`}</tbody></table></div>`;
 export const notice=(s,kind='info')=>`<div class="notice ${kind}">${esc(s)}</div>`;
 export function message(s,kind='error'){if(kind==='error')s=userMessage(s);
  const d=$('#v4dialog');let e=d?.open?$('#v4message'):$('#message');if(!e)return;e.hidden=!s;e.className='message '+kind;e.textContent=s;e.setAttribute('role',kind==='error'?'alert':'status');e.setAttribute('aria-live',kind==='error'?'assertive':'polite');
@@ -20,8 +21,8 @@ let cleanup=()=>{};
 export function closeModal(){const d=$('#v4dialog');if(d?.dataset.busy==='true')return;cleanup();cleanup=()=>{};d?.close();}
 export function onModalClose(f){cleanup=f;}
 export function modal(title,body,onSubmit=null,label='저장'){
- let d=$('#v4dialog');if(!d){d=document.createElement('dialog');d.id='v4dialog';document.body.append(d);}if(d.open)closeModal();d.dataset.busy='false';
- d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.4</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
+ let d=$('#v4dialog');if(!d){d=document.createElement('dialog');d.id='v4dialog';document.body.append(d);}if(!d.dataset.sortAttached){d.addEventListener('click',e=>{const b=e.target.closest('[data-table-sort]');if(b&&d.contains(b)){e.preventDefault();localHeaderSort(b);}});d.dataset.sortAttached='true';}if(d.open)closeModal();d.dataset.busy='false';
+ d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.5.1</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
  $('#v4cancel').onclick=$('#v4dismiss').onclick=closeModal;d.oncancel=e=>{if(d.dataset.busy==='true'){e.preventDefault();return;}cleanup();cleanup=()=>{};};d.showModal();
  let key=crypto.randomUUID(),frozen=null;
  $('#v4form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요.'),true);

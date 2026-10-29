@@ -110,18 +110,38 @@ def selected_visible(page):
 with sync_playwright() as pw:
  browser=pw.chromium.launch(executable_path=os.environ.get('DNM_CHROMIUM') or shutil.which('chromium') or pw.chromium.executable_path,headless=True,args=['--no-sandbox'])
  try:
-  c=browser.new_context(viewport={'width':1440,'height':900});install(c,'admin');p=c.new_page();p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
+  c=browser.new_context(viewport={'width':1440,'height':900});install(c,'admin');p=c.new_page();p.set_default_timeout(4500);p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
   check('admin lands at independent dashboard',p.locator('[aria-current=page]').get_attribute('data-tab')=='dashboard')
   check('global expand controls removed',p.locator('#expandNav,#collapseNav').count()==0)
   check('dashboard outside any group',p.locator('[data-tab=dashboard]').locator('xpath=ancestor::details').count()==0)
   check('seven groups',p.locator('#sideMenu details').count()==7)
   # every menu navigation and help are exercised against mock API.
-  for key in meta['labels']:
+  for key in [*meta['top'],*(p for _,pages in meta['groups'] for p in pages)]:
    go(p,key)
    check('page '+key,p.locator('#title').inner_text()==meta['labels'][key])
    check('selection visible '+key,selected_visible(p))
    check('one current '+key,p.locator('#sideMenu [aria-current=page]').count()==1)
    p.click('#vhelp');p.wait_for_selector('#v4dialog[open]');check('help '+key,len(p.locator('#v4dialog').inner_text())>20);p.click('#v4dismiss')
+  # v4.5: customer order opens Routing directly, without pre-registering a product template.
+  go(p,'orders'); p.locator('[data-vaction="newRouting"]').first.click(); p.wait_for_selector('#v4dialog[open]')
+  check('direct Routing from customer order', '수주에서 Routing Sheet 바로 작성' in p.locator('#v4dialog').inner_text())
+  check('direct Routing has blank-draft source', p.locator('#routeSource option[value="blank"]').count()==1)
+  check('exact previous Routing is optionally available', p.locator('#routeSource option[value="history:r1"]').count()==1)
+  check('existing reviewed template remains optional', p.locator('#routeSource option[value="template:tpl1"]').count()==1)
+  p.on('dialog',lambda d:d.accept())
+  p.select_option('#routeSource','blank')
+  check('blank source permits working without a pre-existing template',p.locator('#stepsHost .step-card').count()==1)
+  p.locator('#stepsHost [data-s="name"]').fill('검수 신규공정')
+  p.locator('#stepsHost [data-s="code"]').fill('010')
+  check('independent equipment and employee options',p.locator('#stepsHost [data-s="equipment_id"]').count()==1 and p.locator('#stepsHost [data-team]').count()>0)
+  p.click('#v4dismiss')
+  go(p,'sourceReview'); check('bulk use activate available',p.locator('[data-vaction="bulkUseMaster"]').count()==1)
+  go(p,'workforceSetup'); check('old fixed equipment-worker constraint removed', '설비·작업자·가능공정' not in p.locator('#content').inner_text())
+  # Work screen provides independent date and work status filters.
+  go(p,'touchWork');check('worker status filter exists',p.locator('#workStatus').count()==1);p.select_option('#workScope','all');p.wait_for_timeout(120)
+  p.locator('[data-vaction="start"]').first.click();p.wait_for_selector('#v4dialog[open]')
+  check('worker selects date when starting',p.locator('#v4dialog [name="work_date"]').count()==1)
+  p.click('#v4dismiss')
   check('no browser page errors',not errors)
   # Short desktop and all groups manually expanded: independent scrollbar.
   p.set_viewport_size({'width':1280,'height':600})
@@ -147,10 +167,42 @@ with sync_playwright() as pw:
   go(p,'equipment');p.screenshot(path=str(OUT/'desktop-equipment.png'),full_page=False)
   # User manually closes group then navigates from main content callback.
   go(p,'dashboard');p.locator('[data-vaction="routeDetail"]').first.click();p.wait_for_selector('#v4dialog[open]');p.click('#v4dismiss');check('dashboard route modal preserved')
+  # v4.5.1: all matching orders must be sorted before paging.
+  p.evaluate('''()=>{const o=window.__testData.records.find(x=>x.kind==='order');for(let i=1;i<=40;i++){
+   const r=structuredClone(o);r.id='sort-order-'+i;r.code='SO-'+String(100+i);r.title='가상 정렬품 '+i;
+   r.data={...r.data,part_no:'SORT-'+i,production_no:r.code,qty:i,due_date:'2026-11-'+String(i%28+1).padStart(2,'0')};
+   window.__testData.records.push(r);
+  }}''')
+  go(p,'orders')
+  check('order quantity header clickable',p.locator('#content thead [data-table-sort="4"]').count()==1)
+  p.locator('#content thead [data-table-sort="4"]').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:nth-child(5)")?.textContent.trim()==="1"')
+  check('order quantity asc over all 41 orders',p.locator('#content tbody tr td:nth-child(5)').first.inner_text().strip()=='1')
+  check('orders list shows first 30',p.locator('#content tbody tr').count()==30)
+  p.locator('#vnext').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:nth-child(5)")?.textContent.trim()==="31"')
+  check('order quantity next page starts at 31',p.locator('#content tbody tr td:nth-child(5)').first.inner_text().strip()=='31')
+  p.locator('#content thead [data-table-sort="4"]').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:nth-child(5)")?.textContent.trim()==="100"')
+  check('order descending over all pages',p.locator('#content tbody tr td:nth-child(5)').first.inner_text().strip()=='100')
+  check('sort arrow and accessible state',p.locator('#content thead th').nth(4).get_attribute('aria-sort')=='descending')
+  check('order management column not sortable',p.locator('#content thead [data-table-sort="14"]').count()==0)
+  p.screenshot(path=str(OUT/'sortable-orders.png'),full_page=False)
+  # 44 equipment records distributed across two pages.
+  go(p,'equipment')
+  p.locator('#content thead [data-table-sort="0"]').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:first-child")?.textContent.trim()==="NC-001"')
+  p.locator('#vnext').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:first-child")?.textContent.trim()==="NC-031"')
+  check('equipment codes sorted across all 44 records',p.locator('#content tbody tr td:first-child').first.inner_text().strip()=='NC-031')
+  p.locator('#content thead [data-table-sort="0"]').click()
+  p.wait_for_function('()=>document.querySelector("#content tbody tr td:first-child")?.textContent.trim()==="NC-044"')
+  check('equipment descending across all records',p.locator('#content tbody tr td:first-child').first.inner_text().strip()=='NC-044')
+  p.screenshot(path=str(OUT/'sortable-equipment.png'),full_page=False)
   c.close()
   # Actual mobile drawer closed/open/selection/scroll/focus and overflow.
   for width in [320,360,390,768]:
-   c=browser.new_context(viewport={'width':width,'height':800},is_mobile=True,has_touch=True);install(c,'admin');p=c.new_page();p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
+   c=browser.new_context(viewport={'width':width,'height':800},is_mobile=True,has_touch=True);install(c,'admin');p=c.new_page();p.set_default_timeout(4500);p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
    check(f'{width} menu initially closed',not p.locator('#sideNav').is_visible())
    go(p,'equipment',True)
    check(f'{width} drawer closes on selection',not p.locator('#sideNav').is_visible())
@@ -166,12 +218,12 @@ with sync_playwright() as pw:
    if width==360:p.screenshot(path=str(OUT/'mobile-instructions-360.png'),full_page=False)
    c.close()
   # Worker ACL excludes other business groups. Real API not used and no RLS claim.
-  c=browser.new_context(viewport={'width':1440,'height':900});install(c,'worker');p=c.new_page();p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
+  c=browser.new_context(viewport={'width':1440,'height':900});install(c,'worker');p=c.new_page();p.set_default_timeout(4500);p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")')
   check('worker lands own touch work',p.locator('[aria-current=page]').get_attribute('data-tab')=='touchWork')
   check('worker no dashboard or equipment or purchase',p.locator('[data-tab=dashboard],[data-tab=equipment],[data-tab=purchase]').count()==0)
   check('worker existing menu set preserved',set(p.locator('[data-tab]').evaluate_all('(es)=>es.map(e=>e.dataset.tab)'))=={'touchWork','voiceWork','worklogs','notes'})
   p.screenshot(path=str(OUT/'worker-menu.png'),full_page=False);c.close()
-  c=browser.new_context(viewport={'width':1280,'height':800});install(c,'readonly');p=c.new_page();p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")');go(p,'equipment')
+  c=browser.new_context(viewport={'width':1280,'height':800});install(c,'readonly');p=c.new_page();p.set_default_timeout(4500);p.on('pageerror',lambda e:errors.append(str(e)));launch_page(p,c);p.wait_for_selector('#title');p.wait_for_function('()=>document.querySelector("#connection")?.textContent.includes("연결됨")');go(p,'equipment')
   check('equipment reader sees no new/edit/import',p.locator('[data-vaction=newMaster],[data-vaction=editMaster],[data-vaction=importMaster]').count()==0)
   go(p,'instruments');check('instrument reader sees no new/edit/import',p.locator('[data-vaction=newMaster],[data-vaction=editMaster],[data-vaction=importMaster]').count()==0)
   go(p,'instructions');p.locator('[data-vaction=routeDetail]').first.click();p.wait_for_selector('#v4dialog[open]');check('instruction reader cannot assign or release',p.locator('#v4dialog [data-vaction=assign],#v4dialog [data-vaction=release]').count()==0);c.close()
