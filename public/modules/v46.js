@@ -14,7 +14,7 @@ export class V46Controller extends V44Controller{
  async purchases(){
   const rows=this.filter(await this.rec('purchase'));
   if(this.page!=='purchase')return;
-  const status=r=>purchaseFlowState(r);
+  const status=r=>purchaseFlowState(r)+(r.data.buyer_review&&!r.data.buyer_review.at&&['SUBMITTED','APPROVED'].includes(r.state)?' · 담당자 확인 대기':'');
   this.set(`<div class="card purchase-workflow"><div class="sectionhead"><h2>구매업무 진행순서</h2><span class="tag">구매의뢰 → 승인 → 견적(선택) → 발주</span></div><div class="purchase-steps"><span>① 구매의뢰</span><span>② 결재승인</span><span>③ 견적의뢰 <small>선택</small></span><span>④ 발주서</span><span>⑤ 품목별 입고</span><span>⑥ 업체별 지급·집계</span></div>${notice('승인한 구매의뢰 1건에서 발주서 1건을 만듭니다. 견적의뢰는 필요할 때만 작성합니다.')}</div>
   <div class="card">${this.top(this.able('purchase')?btn('newPurchase','구매의뢰서 작성','','primary'):'')}
   ${table(['구매의뢰번호','공급업체','총액(VAT 포함)','등록일','진행단계','관리'],this.pagedCells(rows,r=>[esc(r.code),esc(r.data.supplier||r.title),moneyText(r.data.total),clock(r.created_at),`<span class="purchase-status">${esc(status(r))}</span>`,btn('purchaseDetail','상세·결재·문서',r.id)]))}<div id="v4pager" class="pagination"></div></div>`);
@@ -25,12 +25,18 @@ export class V46Controller extends V44Controller{
   const approvals=r.data.approvals||[],current=approvals[r.data.current_step],me=current?.user_id===this.ctx.profile.id;
   const receiptRows=isRead(this.ctx,'receipts')?await this.rec('receipt',{parent:id}).catch(()=>[]):[];
   const qtyRows=receiptQuantities(r,receiptRows);
+  const legacyCandidate=this.ctx.profile.role==='admin'&&r.state==='SUBMITTED'&&!r.data.buyer_review&&r.data.current_step===0&&approvals.length>=2;
+  const canConvert=legacyCandidate&&(await this.rpc('dnm_v492_buyer',{})).user_id===approvals[0].user_id;
   const documentButtons=[btn('printPurchaseRequest','구매의뢰서 PDF·인쇄',r.id),btn('sharePurchaseRequest','구매의뢰서 이미지 공유',r.id),r.data.quote_request?.quote_no?btn('printPurchaseQuote','견적의뢰서 PDF·인쇄',r.id)+btn('sharePurchaseQuote','견적의뢰서 이미지 공유',r.id):'',r.data.po_no?btn('printPurchaseOrder','발주서 PDF·인쇄',r.id)+btn('sharePurchaseOrder','발주서 이미지 공유',r.id):''].join('');
-  modal('구매업무 · '+r.code,`<div class="purchase-overview"><div><small>공급업체</small><strong>${esc(r.data.supplier||r.title)}</strong></div><div><small>현재 단계</small><strong>${esc(purchaseFlowState(r))}</strong></div><div><small>총 승인금액</small><strong>${moneyText(r.data.total)}원</strong></div></div>
+  modal('구매업무 · '+r.code,`<div class="purchase-overview"><div><small>공급업체</small><strong>${esc(r.data.supplier||r.title)}</strong></div><div><small>현재 단계</small><strong>${esc(purchaseFlowState(r))}</strong></div><div><small>의뢰 참고금액</small><strong>${moneyText(r.data.request_terms?.total??r.data.total)}원</strong></div></div>
    ${table(['품명','규격 / 사양','수량','단위','단가','금액'],(r.data.lines||[]).map(l=>[esc(l.item),esc(l.specification),moneyText(l.qty),esc(l.unit),moneyText(l.unit_price),moneyText(l.amount)]))}
+   <h3>구매담당자 확인</h3>${r.data.buyer_review?notice(r.data.buyer_review.name+' · '+(r.data.buyer_review.at?'확인 완료 '+clock(r.data.buyer_review.at):'확인 대기')):notice('기존 결재선으로 상신된 문서입니다.')}
+   ${r.data.buyer_review?.user_id===this.ctx.profile.id&&!r.data.buyer_review.at&&['SUBMITTED','APPROVED'].includes(r.state)?btn('buyerReview','내용 확인',r.id,'primary'):''}
+   ${r.data.po_no?notice('발주금액 '+moneyText(r.data.total)+'원 · 입고 확정금액(VAT 포함) '+(r.data.received_total!=null?moneyText(r.data.received_total):['RECEIVED','MATCHED','PAID'].includes(r.state)?moneyText(r.data.total):'이전 입고내역 참고 ')+'원'):''}
+   ${canConvert?btn('convertReview','기존 첫 결재를 담당자 확인란으로 전환',r.id):''}
    <h3>결재 진행</h3>${table(['순서','결재자','필수','상태','의견'],approvals.map((a,i)=>[i+1,esc(this.person(a.user_id)),a.required?'필수':'일반',pill(a.state),esc(a.opinion||a.reason||'')]))}
    <div class="purchase-actions">${r.state==='SUBMITTED'&&me&&this.able('approve')?btn('approve','승인',r.id,'primary')+btn('delegate','전결',r.id)+btn('reject','반려',r.id):''}
-   ${r.state==='APPROVED'&&this.able('purchase')&&permit(this.ctx,'receipts','update')?btn('purchaseQuote','견적의뢰서 작성 (선택)',r.id)+btn('purchaseOrder','발주서 발행',r.id,'primary'):''}
+   ${r.state==='APPROVED'&&permit(this.ctx,'receipts','update')?btn('purchaseQuote','견적의뢰서 작성 (선택)',r.id)+(r.data.buyer_review&&!r.data.buyer_review.at?'구매담당자 확인 대기':btn('purchaseOrder','발주서 발행',r.id,'primary')):''}
    ${['ORDERED','PARTIAL'].includes(r.state)&&permit(this.ctx,'receipts','create')?btn('receive','품목별 입고',r.id,'primary'):''}
    ${r.state==='RECEIVED'&&permit(this.ctx,'settlement','create')?btn('settle','입고·증빙 대사 (선택)',r.id):''}</div>
    ${qtyRows.length?`<h3>품목별 입고현황</h3>${table(['품목','발주수량','누적 합격','불합격','잔량'],qtyRows.map(x=>[esc(x.item)+'<small> '+esc(x.specification)+'</small>',moneyText(x.ordered),moneyText(x.received),moneyText(x.rejected),`<b>${moneyText(x.remaining)}</b>`]))}`:''}
@@ -44,17 +50,18 @@ export class V46Controller extends V44Controller{
  }
  async purchaseForm(seed=null){
   this.ctx=await this.s.context();
-  const people=(this.ctx.people||[]).filter(x=>x.approver&&x.id!==this.ctx.profile.id);
+  const buyer=await this.rpc('dnm_v492_buyer',{});
+  const people=(this.ctx.people||[]).filter(x=>x.approver&&x.id!==this.ctx.profile.id&&x.id!==buyer.user_id);
   let cat=[];let lookupError='';try{cat=await this.loadCatalog();}catch(e){lookupError=e.message;}
   let lines=[{item:seed?.title||'',specification:seed?.data?.specification||'',qty:1,unit:seed?.data?.unit||'',unit_price:seed?.data?.unit_price??''}],approvals=[{user_id:'',required:false}];
   const supplier=seed?.data?.supplier||'';
   const draft=modal('구매의뢰서 작성',`<p class="muted">품명 일부를 입력하면 기존 사용품목을 추천합니다. 신규 품목·규격은 그대로 입력할 수 있습니다. 미사용·검토대기 자재는 참고 표시되며, 선택해도 기준정보 상태는 바뀌지 않습니다.</p>
-  <div class="fields">${input('supplier','공급업체명',supplier,'text','required maxlength="200"')}${input('due_date','입고 희망일','','date')}</div>
+  <div class="fields">${input('supplier','참고 구매처 (선택)',supplier,'text','maxlength="200"')}${input('due_date','입고 희망일','','date')}</div>
   ${lookupError?notice('품목 검색을 불러오지 못했습니다. 직접 입력은 가능합니다. '+lookupError,'warning'):''}<h3>구매 품목</h3><div id="purchaseLines"></div><button type="button" id="addPurchaseLine" class="secondary">+ 품목 추가</button>
   ${select('tax_rate','부가세',[['0.1','과세 10%'],['0','면세/영세 0%']],'0.1')}
-  <h3>순차 결재선</h3>${!people.length?notice('선택 가능한 결재자가 없습니다. 관리자에게 구매 결재자 지정을 요청하세요. 본인은 결재자로 선택할 수 없습니다.','warning'):''}<div id="approvalLines"></div><button type="button" id="addApprover" class="secondary">+ 결재자 추가</button>
+  ${notice(buyer.active?'구매담당자 확인 · '+buyer.name+' (자동 지정)':'상신하려면 관리자가 사용자별 권한 · 전결에서 구매담당자를 지정해야 합니다.')}<h3>순차 결재선</h3>${!people.length?notice('선택 가능한 결재자가 없습니다. 관리자에게 구매 결재자 지정을 요청하세요. 본인은 결재자로 선택할 수 없습니다.','warning'):''}<div id="approvalLines"></div><button type="button" id="addApprover" class="secondary">+ 결재자 추가</button>
   ${area('note','구매 목적 / 특기사항')}${notice('결재승인 후 견적의뢰서를 작성하거나 바로 발주서를 발행할 수 있습니다.')}`,
-  async(f,k)=>{read();for(const l of lines){l.item=required(l.item,'품명',200);l.specification=String(l.specification||'').trim().slice(0,200);l.unit=required(l.unit,'단위',20);l.qty=qty(l.qty,'수량',false);l.unit_price=money(l.unit_price);}if(approvals.some(a=>!a.user_id))throw Error('결재자를 선택하세요.');if(new Set(approvals.map(a=>a.user_id)).size!==approvals.length)throw Error('결재자 중복입니다.');await this.command('purchase_submit',{data:{...f,lines,tax_rate:Number(f.tax_rate),approvals}},k);},'결재 상신');
+  async(f,k)=>{read();for(const l of lines){l.item=required(l.item,'품명',200);l.specification=String(l.specification||'').trim().slice(0,200);l.unit=required(l.unit,'단위',20);l.qty=qty(l.qty,'수량',false);l.unit_price=money(l.unit_price||0);}if(approvals.some(a=>!a.user_id))throw Error('결재자를 선택하세요.');if(new Set(approvals.map(a=>a.user_id)).size!==approvals.length)throw Error('결재자 중복입니다.');await this.command('purchase_submit',{data:{...f,lines,tax_rate:Number(f.tax_rate),approvals}},k);},'결재 상신');
   const root=draft.querySelector('.modalbody');
   const read=()=>{lines=all('.purchase-line',root).map(el=>Object.fromEntries(all('[data-field]',el).map(x=>[x.dataset.field,x.value])));approvals=all('.a-line',root).map(el=>({user_id:el.querySelector('select').value,required:el.querySelector('input[type=checkbox]').checked}));};
   const fillOptions=(i,itemVal,specVal,field='item')=>{
@@ -81,7 +88,7 @@ export class V46Controller extends V44Controller{
     <label>규격 / 사양<input data-field="specification" value="${esc(l.specification)}" maxlength="200" autocomplete="off" placeholder="선택 또는 입력"></label>
     <label>수량<input data-field="qty" type="number" min="1" step="1" value="${esc(l.qty)}" required></label>
     <label>단위<input data-field="unit" value="${esc(l.unit)}" required maxlength="20"></label>
-    <label>예상 단가<input data-field="unit_price" type="number" min="0" step="0.01" value="${esc(l.unit_price)}" required placeholder="확인 후 입력"></label>
+    <label>예상 단가<input data-field="unit_price" type="number" min="0" step="0.01" value="${esc(l.unit_price)}" placeholder="미정이면 공란"></label>
     <button type="button" class="quiet" data-remove-purchase="${i}" title="행 삭제" aria-label="${i+1}행 삭제">×</button><div data-suggestions class="purchase-suggestions" hidden></div></div>`).join('');
    $('#approvalLines',root).innerHTML=approvals.map((a,i)=>`<div class="a-line"><span class="stepnum">${i+1}</span><select required aria-label="${i+1}번째 결재자"><option value="">결재자 선택</option>${people.map(p=>`<option value="${esc(p.id)}" ${p.id===a.user_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select><label class="check"><input type="checkbox" ${a.required?'checked':''}>필수 결재</label><button type="button" class="quiet" data-remove-approver="${i}" aria-label="결재자 삭제">×</button></div>`).join('');
 
@@ -119,9 +126,11 @@ export class V46Controller extends V44Controller{
  async purchaseOrder(r){
   if(r.state!=='APPROVED')throw Error('결재승인된 구매의뢰만 발주할 수 있습니다.');
   const dt=seoulDate();const number='PO-'+r.code.replace(/^PR-/,'');
-  modal('발주서 발행 · '+r.code,`<p><b>공급업체: ${esc(r.data.supplier)}</b> · 승인금액 ${moneyText(r.data.total)}원</p>${notice('구매의뢰 1건당 발주서 1건만 확정됩니다. 확정 후 금액·품목 변경은 재승인 절차가 필요합니다.')}
+  modal('발주서 발행 · '+r.code,`<p><b>공급업체: ${esc(r.data.supplier)}</b> · 의뢰 참고금액 ${moneyText(r.data.total)}원</p>${notice('구매의뢰 1건당 발주서 1건만 확정됩니다. 발주할 실제 구매처와 품목별 단가를 입력하세요. 입고 때 실제 단가를 확정합니다.')}
+  ${input('order_supplier','실제 발주 구매처',r.data.supplier==='미정'?'':r.data.supplier,'text','required maxlength="200"')}
+  ${(r.data.lines||[]).map((l,i)=>input('price_'+i,(i+1)+'. '+l.item+' '+(l.specification||'')+' · 발주 단가',l.unit_price||'','number','required min="0" max="10000000000" step="0.01"')).join('')}
   <div class="fields">${input('po_no','발주번호',number,'text','required maxlength="100"')}${input('po_date','발주일',dt,'date','required')}${input('po_delivery_date','납기 요청일',r.data.due_date||'','date')}</div>${area('po_note','특기사항 / 발주조건',r.data.note||'')}`,
-  (f,k)=>this.command('purchase_order',{id:r.id,version:r.version,...f},k),'발주 확정');
+  (f,k)=>this.command('purchase_order',{id:r.id,version:r.version,po_no:f.po_no,po_date:f.po_date,po_delivery_date:f.po_delivery_date,po_note:f.po_note,order_supplier:f.order_supplier,prices:r.data.lines.map((_,i)=>money(f['price_'+i]))},k),'발주 확정');
  }
  async receipts(){
   const [prs,receipts]=await Promise.all([this.rec('purchase'),this.rec('receipt')]);
@@ -131,7 +140,7 @@ export class V46Controller extends V44Controller{
    ${table(['발주번호 / 의뢰번호','공급업체','품목수 / 입고진척','상태','관리'],this.pagedCells(orders,r=>{
      const q=receiptQuantities(r,receipts);const done=q.filter(x=>x.remaining===0).length;
      return [esc(r.data.po_no)+'<small> / '+esc(r.code)+'</small>',esc(r.data.supplier||r.title),`${done} / ${q.length} 품목 완료`,pill(r.state),['ORDERED','PARTIAL'].includes(r.state)&&permit(this.ctx,'receipts','create')?btn('receive','품목별 입고',r.id,'primary'):btn('purchaseDetail','발주·입고 상세',r.id)];}))}<div id="v4pager" class="pagination"></div></div>
-   <div class="card"><h2>최근 입고 / 반품 기록</h2>${table(['입고일','발주처 / 품목','품목순번','합격 / 불합격','상태 / 관리'],receipts.slice(0,100).map(r=>[esc(String(r.data.received_at||r.created_at).slice(0,10)),esc(r.data.supplier||'')+' / '+esc(r.title),Number(r.data.line)+1,`${moneyText(r.data.accepted)} / ${moneyText(r.data.rejected)}`,r.state==='CONFIRMED'&&Number(r.data.accepted)>0&&permit(this.ctx,'receipts','create')?btn('returnReceipt','반품',r.id):pill(r.state)]))}</div>`);
+   <div class="card"><h2>최근 입고 / 반품 기록</h2>${table(['입고일','발주처 / 품목','품목순번','합격 / 불합격','입고단가','공급가액','상태 / 관리'],receipts.slice(0,100).map(r=>[esc(String(r.data.received_at||r.created_at).slice(0,10)),esc(r.data.supplier||'')+' / '+esc(r.title),Number(r.data.line)+1,`${moneyText(r.data.accepted)} / ${moneyText(r.data.rejected)}`,moneyText(r.data.unit_price??prs.find(p=>p.id===r.parent_id)?.data.lines?.[Number(r.data.line)]?.unit_price),moneyText(Number(r.data.accepted)*(r.data.unit_price??prs.find(p=>p.id===r.parent_id)?.data.lines?.[Number(r.data.line)]?.unit_price??0)),r.state==='CONFIRMED'&&Number(r.data.accepted)>0&&permit(this.ctx,'receipts','create')?btn('returnReceipt','반품',r.id):pill(r.state)]))}</div>`);
   this.pageFooter(orders);
  }
  async receiveForm(r){
@@ -139,10 +148,10 @@ export class V46Controller extends V44Controller{
   if(!live.length)throw Error('발주 품목이 모두 입고되었습니다.');
   const opts=live.map(x=>[String(x.index),`${x.index+1}. ${x.item} / ${x.specification||'규격 없음'} · 잔량 ${moneyText(x.remaining)} ${x.unit}`]);
   const d=modal('발주별 품목 입고 · '+r.data.po_no,`${notice('입고한 실제 품목과 수량을 등록합니다. 한 발주서의 여러 품목을 날짜별로 나누어 입력할 수 있습니다.')}
-  ${select('line','입고 품목',opts)}<div id="receiptRemain"></div><div class="fields">${input('accepted','합격 입고수량',0,'number','required min="0" step="1"')}${input('rejected','불합격 수량',0,'number','required min="0" step="1"')}</div>${area('note','입고검사 결과 / 증빙 메모')}`,
-  (f,k)=>{const accepted=qty(f.accepted,'합격입고수량'),rejected=qty(f.rejected,'불합격수량');const selected=lines.find(x=>x.index===Number(f.line));if(accepted+rejected===0)throw Error('입고수량을 입력하세요.');if(accepted>selected.remaining)throw Error('합격 입고수량이 잔량을 초과했습니다.');return this.command('purchase_receive',{id:r.id,version:r.version,line:Number(f.line),accepted,rejected,note:f.note},k);},'입고 등록');
+  ${select('line','입고 품목',opts)}<div id="receiptRemain"></div>${input('unit_price','이번 입고 확정단가','','number','required min="0" max="10000000000" step="0.01"')}<div class="fields">${input('accepted','합격 입고수량',0,'number','required min="0" step="1"')}${input('rejected','불합격 수량',0,'number','required min="0" step="1"')}</div>${area('note','입고검사 결과 / 증빙 메모')}`,
+  (f,k)=>{const accepted=qty(f.accepted,'합격입고수량'),rejected=qty(f.rejected,'불합격수량');const selected=lines.find(x=>x.index===Number(f.line));if(accepted+rejected===0)throw Error('입고수량을 입력하세요.');if(accepted>selected.remaining)throw Error('합격 입고수량이 잔량을 초과했습니다.');return this.command('purchase_receive',{id:r.id,version:r.version,line:Number(f.line),accepted,rejected,unit_price:money(f.unit_price),note:f.note},k);},'입고 등록');
   const line=d.querySelector('[name="line"]'),help=d.querySelector('#receiptRemain');
-  const refresh=()=>{const l=lines.find(x=>x.index===Number(line.value));help.innerHTML=`<p class="notice info">발주 ${moneyText(l.ordered)} / 누적 합격 ${moneyText(l.received)} / 현재 잔량 <b>${moneyText(l.remaining)} ${esc(l.unit)}</b></p>`;};line.onchange=refresh;refresh();
+  const refresh=()=>{const l=lines.find(x=>x.index===Number(line.value));d.querySelector('[name="unit_price"]').value=r.data.lines[l.index].unit_price;help.innerHTML=`<p class="notice info">발주 ${moneyText(l.ordered)} / 누적 합격 ${moneyText(l.received)} / 현재 잔량 <b>${moneyText(l.remaining)} ${esc(l.unit)}</b></p>`;};line.onchange=refresh;refresh();
  }
  async settlements(){
   const [rows,prs,partners]=await Promise.all([this.rec('settlement'),this.rec('purchase'),this.api.rows('partners','select=name,category,active&limit=1000').then(r=>r.data||[]).catch(()=>[])]);
@@ -156,7 +165,7 @@ export class V46Controller extends V44Controller{
   ${notice('업체별 실제 지급한 금액·날짜를 기록합니다. 은행 송금은 실행하지 않으며, 구매 증빙대사와 구분합니다.')}
   <form id="paymentFilters" class="payment-filters"><label>기간 시작<input type="date" name="from" value="${esc(filter.from)}"></label><label>기간 종료<input type="date" name="to" value="${esc(filter.to)}"></label>${select('supplier','업체',[['','전체 거래처'],...suppliers.map(x=>[x,x])],filter.supplier)}<button type="submit" class="secondary">조회</button><button id="paymentAll" type="button" class="quiet">전체</button><button id="paymentCSV" type="button" class="secondary">CSV</button></form>
   <div class="kpis payment-kpis"><article><span>조회 기간 지급합계</span><strong>${moneyText(total)}원</strong></article><article><span>입력된 지급내역</span><strong>${shown.length}건</strong></article><article><span>거래업체</span><strong>${sum.length}곳</strong></article></div>
-  <h3>거래처별 지급합계</h3>${table(['거래처','지급건수','지급합계'],sum.map(x=>[esc(x.supplier),`${x.count}건`,`<b>${moneyText(x.amount)}원</b>`]))}
+  <h3>발주별 입고·지급 잔액 (누계)</h3>${table(['구매처','발주번호','발주금액','입고 확정액(VAT 포함)','연결 지급액','미지급 / 초과 지급(−)'],prs.filter(p=>p.data.po_no&&(!filter.supplier||p.data.supplier===filter.supplier)).map(p=>{const received=p.data.received_total??(['RECEIVED','MATCHED','PAID'].includes(p.state)?p.data.total:null),used=paymentRows.filter(x=>x.po_id===p.id).reduce((n,x)=>n+x.amount,0);return [esc(p.data.supplier),esc(p.data.po_no),moneyText(p.data.total),received==null?'이전 부분입고':moneyText(received),moneyText(used),received==null?'—':moneyText(received-used)];}))}<h3>거래처별 지급합계</h3>${table(['거래처','지급건수','지급합계'],sum.map(x=>[esc(x.supplier),`${x.count}건`,`<b>${moneyText(x.amount)}원</b>`]))}
   <h3>지급내역</h3>${table(['지급일','업체','지급액','증빙/참조','발주 연결','관리'],this.pagedCells(shown,r=>[esc(r.date),esc(r.supplier),`<b>${moneyText(r.amount)}원</b>`,esc(r.reference||'—'),esc(prs.find(p=>p.id===r.po_id)?.data?.po_no||'—'),r.legacy?'<small>이전 지급기록</small>':permit(this.ctx,'settlement','update')?btn('editPayment','수정',r.id):'조회']))}<div id="v4pager" class="pagination"></div></div>`);
   this.pageFooter(shown);
   $('#paymentFilters').onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));if(f.from&&f.to&&f.from>f.to){message('기간 시작일이 종료일보다 늦습니다.');return;}this.paymentFilters={from:f.from||'',to:f.to||'',supplier:f.supplier||''};this.pageNo=1;this.settlements().catch(x=>message(x.message));};
@@ -182,6 +191,14 @@ export class V46Controller extends V44Controller{
  }
  async action(action,id){
   if(action==='goEquipmentActivation'){if(this.ctx.profile.role!=='admin')throw Error('관리자만 사용상태를 일괄 변경할 수 있습니다.');this.reviewKind='equipment';return this.go('sourceReview');}
+  if(action==='convertReview'){
+   const r=await this.s.one(id);
+   return modal('기존 첫 결재 전환',notice(r.code+' · 첫 결재자를 구매담당 확인란으로 옮기고 후속 결재자를 첫 순번으로 변경합니다.'),async()=>{await this.rpc('dnm_v492_convert_review',{p_id:id,p_version:r.version});await this.load(this.page);},'확인 후 전환');
+  }
+  if(action==='buyerReview'){
+   const r=await this.s.one(id);
+   return modal('구매의뢰 내용 확인',notice(r.code+' · 내용을 확인한 담당자와 시각이 기록됩니다.'),async()=>{await this.rpc('dnm_v492_review',{p_id:id,p_version:r.version});await this.load(this.page);},'확인 기록');
+  }
   if(action==='purchaseQuote')return this.purchaseQuote(await this.s.one(id));
   if(action==='purchaseOrder')return this.purchaseOrder(await this.s.one(id));
   if(action==='addPayment')return this.paymentForm();

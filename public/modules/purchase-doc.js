@@ -6,7 +6,7 @@ const types={request:'구매의뢰서',quote:'견적의뢰서',order:'발주서'
 const KRW=v=>Number(v||0).toLocaleString('ko-KR',{maximumFractionDigits:2});
 export const purchaseDocName=(r,type)=>`${types[type]||'구매문서'}_${String(type==='order'?r.data?.po_no:type==='quote'?r.data?.quote_request?.quote_no:r.code||'').replace(/[^a-zA-Z0-9가-힣_.-]/g,'_')||'미발급'}`;
 export function purchaseDocData(r,type){
- const d=r.data||{},q=d.quote_request||{},lines=d.lines||[];
+ const d=type!=='order'&&r.data?.request_terms?{...r.data,...r.data.request_terms}:r.data||{},q=d.quote_request||{},lines=d.lines||[];
  const number=type==='request'?r.code:type==='quote'?q.quote_no:d.po_no;
  if(!types[type]||!number)throw Error('발행된 문서를 선택하세요.');
  const issue=type==='request'?String(r.created_at||'').slice(0,10):type==='quote'?q.issued_date:d.po_date;
@@ -15,7 +15,7 @@ export function purchaseDocData(r,type){
 export function purchaseDocumentMarkup(r,type){
  const d=purchaseDocData(r,type),isQuote=type==='quote';
  const approvers=r.data?.approvals||[];
- const head= type==='request'?`<div class="dnm-doc-sign"><span>작성</span><span>검토</span><span>승인</span></div>`:`<div class="dnm-doc-company"><strong>㈜디엔엠</strong><div>사업자등록번호 459-81-00157</div><div>전화 055-294-0996</div></div>`;
+ const head= type==='request'?`<div class="dnm-doc-sign"><span>작성</span><span>구매담당 확인 · ${esc(r.data?.buyer_review?.name||'—')} ${r.data?.buyer_review?.at?'(완료)':''}</span><span>승인</span></div>`:`<div class="dnm-doc-company"><strong>㈜디엔엠</strong><div>사업자등록번호 459-81-00157</div><div>전화 055-294-0996</div></div>`;
  const detail=`<div class="dnm-doc-info"><p><b>문서번호</b> ${esc(d.number)}</p><p><b>작성일</b> ${esc(d.issue)}</p><p><b>수신</b> ${esc(d.recipient||'담당자 귀하')}</p><p><b>${isQuote?'회신희망일':'요청납기'}</b> ${esc(d.delivery||'별도 협의')}</p></div>`;
  const rows=d.lines.map((l,i)=>`<tr><td>${i+1}</td><td>${esc(l.item)}</td><td>${esc(l.specification||'')}</td><td>${esc(l.unit||'')}</td><td class="num">${KRW(l.qty)}</td>${isQuote?'':`<td class="num">${KRW(l.unit_price)}</td><td class="num">${KRW(l.amount)}</td>`}<td>${esc(l.note||'')}</td></tr>`).join('');
  return `<div class="dnm-purchase-doc"><header class="dnm-doc-header"><div class="dnm-doc-mark">DNM <small>㈜디엔엠 · DNM CO., LTD.</small></div>${head}</header><div class="dnm-doc-title">${d.title}</div>${detail}<p class="dnm-doc-intro">${esc(d.subject)}</p><table class="dnm-doc-lines"><thead><tr><th>No.</th><th>품명</th><th>규격 / 사양</th><th>단위</th><th>수량</th>${isQuote?'':'<th>단가</th><th>금액</th>'}<th>비고</th></tr></thead><tbody>${rows}</tbody></table>${isQuote?'':`<div class="dnm-doc-totals"><span>공급가액 ${KRW(d.subtotal)}원</span><span>부가세 ${KRW(d.tax)}원</span><strong>총액 ${KRW(d.total)}원</strong></div>`}<div class="dnm-doc-note"><b>특기사항 / 비고</b><p>${esc(d.notes||'')}</p></div>${type==='request'?`<div class="dnm-doc-foot">결재선: ${approvers.length}명 · 시스템 기록 기준</div>`:'<div class="dnm-doc-foot">공식 발행 및 수신 여부는 담당자가 확인하십시오.</div>'}<footer class="dnm-doc-bottom">F7020-01(0) · ㈜디엔엠 · DNM 구매업무관리</footer></div>`;
@@ -48,6 +48,7 @@ export function purchaseCanvas(r,type){
  const bottom=tableTop+lineH*(d.lines.length+1);rule(bottom,padding,W-padding,2,ink);
  if(type!=='quote'){write(`공급가 ${KRW(d.subtotal)}원  |  VAT ${KRW(d.tax)}원`,padding,bottom+55,21,sub);write(`총액 ${KRW(d.total)}원`,W-padding,bottom+55,28,ink,'right',true);}
  const ty=bottom+(type==='quote'?65:112);write('특기사항 / 비고',padding,ty,22,ink,'left',true);write(d.notes||'—',padding,ty+42,19,sub,'left',false,W-2*padding);
+ if(type==='request'&&r.data?.buyer_review)write('구매담당자 확인 · '+r.data.buyer_review.name+' · '+(r.data.buyer_review.at?'완료':'대기'),padding,height-175,20,ink);
  rule(height-135);write('㈜디엔엠  ·  구매업무관리',padding,height-96,19,sub);write(`출력 ${seoulDate()}`,W-padding,height-96,18,sub,'right');
  return canvas;
 }

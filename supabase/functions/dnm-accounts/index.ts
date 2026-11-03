@@ -1,3 +1,4 @@
+import {Buffer} from 'node:buffer';
 import {randomBytes,createHash,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 const scrypt=promisify(scryptCallback);
@@ -92,7 +93,7 @@ export function createHandler({env=process.env,fetcher=globalThis.fetch,backendF
     if(!ip)throw new AccountError('접속환경 확인에 실패했습니다. 회사 MES 주소에서 사용하세요.',503,'CLIENT_IP_REQUIRED');
     const allowed=String(env.DNM_INITIAL_LOGIN_ALLOWED_IPS||'').split(',').map(x=>x.trim()).filter(Boolean);
     if(p.action!=='name_login'&&allowed.length&&!allowed.includes(ip))throw new AccountError('초기 비밀번호 설정은 관리자가 허용한 회사 네트워크에서 진행하세요.',403,'NETWORK_RESTRICTED');
-    await b.throttle('ip:'+sha(ip),ip==='supabase-edge'?1200:120,900);
+    await b.throttle('ip:'+sha(ip),ip==='supabase-edge'?1000:120,900);
    }
    if(p.action==='public_status'){await b.rpc('health');return json({ok:true,version:'4.9.0'});}
    if(p.action==='name_login'||p.action==='name_temporary_login'){

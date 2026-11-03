@@ -90,9 +90,10 @@ export class V43Controller extends V421Controller{
   const rows=workers.map(w=>({name:w.name,code:w.code,id:w.profile_id,role:w.role,status:workerLoginStatus(w),active:w.employee_active}));
   for(const a of this.ctx.people||[])if(!linked.has(a.id))rows.push({name:a.name,code:'기존 로그인 계정',id:a.id,role:a.role,status:'기존 계정 유지',active:true});
   const q=this.search.trim().toLowerCase();
-  this.set(`<div class="card">${this.top()}${notice('작업자 명부 전체를 표시합니다. 사용 중인 작업자는 자동으로 계정을 연결합니다. 구매 결재자는 권한 설정에서 지정하세요.')}${this.syncErrorHtml()}${table(['성명 / 사번','로그인 상태','역할','구매 결재','권한'],rows.filter(r=>!q||[r.name,r.code,r.status].join(' ').toLowerCase().includes(q)).map(r=>{
+  const buyer=await this.rpc('dnm_v492_buyer',{});this.currentBuyer=buyer.user_id;
+  this.set(`<div class="card">${this.top()}${notice('작업자 명부 전체를 표시합니다. 사용 중인 작업자는 자동으로 계정을 연결합니다. 구매 결재자는 권한 설정에서 지정하세요.')}${this.syncErrorHtml()}${table(['성명 / 사번','로그인 상태','역할','구매 결재','권한','구매담당자 확인'],rows.filter(r=>!q||[r.name,r.code,r.status].join(' ').toLowerCase().includes(q)).map(r=>{
    const approval=perms.find(a=>a.profile_id===r.id)?.capabilities?.includes('approve');
-   return [esc(r.name)+'<br>'+esc(r.code),esc(r.status),esc(r.role||'미발급'),approval?'지정':'미지정',r.id?(r.role==='admin'?btn('adminApprover','구매 결재자 지정/해제',r.id):btn('moduleAccess','조회·등록·수정·결재 지정',r.id)):'자동 연결 확인 필요'];
+   return [esc(r.name)+'<br>'+esc(r.code),esc(r.status),esc(r.role||'미발급'),approval?'지정':'미지정',r.id?(r.role==='admin'?btn('adminApprover','구매 결재자 지정/해제',r.id):btn('moduleAccess','조회·등록·수정·결재 지정',r.id)):'자동 연결 확인 필요',r.id===buyer.user_id?'현재 담당자':r.active&&r.id?btn('setBuyer','구매담당자 지정',r.id):'—'];
   }))}</div>`);this.bindSearch();
  }
  syncErrorHtml(){return (this.workerSyncErrors||[]).length?notice('자동 연결 미완료: '+this.workerSyncErrors.map(x=>x.name+' — '+x.message).join(' / '),'warning'):'';}
@@ -105,6 +106,7 @@ export class V43Controller extends V421Controller{
  }
  async action(action,id){
   if(action==='syncWorkers')return this.userAccounts();
+  if(action==='setBuyer')return modal('구매담당자 지정',notice(this.person(id)+' 님을 구매의뢰 확인 담당자로 지정합니다. 미확인 의뢰도 새 담당자에게 배정됩니다.'),async()=>{await this.rpc('dnm_v492_set_buyer',{p_user:id,p_previous:this.currentBuyer});await this.access();},'담당자 지정');
   if(action==='adminApprover'){const old=this.permissions.find(p=>p.profile_id===id)?.capabilities?.includes('approve');return modal('관리자 구매 결재권',notice(old?'구매 결재자 지정을 해제합니다.':'관리자를 구매 결재자 목록에 포함합니다.')+area('reason','변경 사유','','required'),async f=>{await this.rpc('dnm_v49_set_admin_approver',{p_user:id,p_enabled:!old,p_reason:f.reason});await this.access();});}
   if(action==='accountEnroll')return this.accountDialog(this.loginWorkers.find(x=>x.id===id),'provision');
   if(action==='accountReset')return this.accountDialog(this.loginWorkers.find(x=>x.id===id),'reset');
