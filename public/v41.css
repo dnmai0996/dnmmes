@@ -19,3 +19,5 @@
 }
 
 #dailyFields[hidden],.field-direct .step-fields>label:has([data-s="equipment_id"]),.field-direct .team-label,.field-direct .step-card>.muted,.field-direct>.notice {display:none}
+
+#stepsHost:not(.civil-sequence) .sequence-option {display:none}

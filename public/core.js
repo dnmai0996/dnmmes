@@ -1,4 +1,4 @@
-export const VERSION='4.9.3';
+export const VERSION='4.9.4';
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function settings(url,key){
  url=String(url??'').trim();key=String(key??'').trim();

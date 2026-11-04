@@ -16,10 +16,10 @@ export const PAGE_HELP={
  templates:['품번을 확인하고 제품별 표준 공정을 등록합니다.','공정번호·순서·유형·설비 후보·검사코드를 확인합니다.','검토완료 후 수주별 Routing 초안에 사용합니다.','템플릿 변경이 이미 배포된 작업지시를 바꾸지는 않습니다.'],
  routeCandidates:['품번 검색 후 원본 공정 후보들을 비교합니다.','원본 파일·시트와 공정순서·설비 후보를 대조합니다.','맞는 후보를 선택하고 확인된 제품 Routing으로 저장합니다.'],
  routingSetup:['검토완료 제품 Routing이 있는 수주를 선택합니다.','담당 생산관리자를 지정하고 Routing 초안을 만듭니다.','공정과 LOT·납기·지시수량을 확인합니다.','설비·작업자가 미배정이면 Routing Sheet 관리에서 지정한 후 배포합니다.'],
- routing:['방산은 수주 전량으로 배포합니다. 민수는 같은 수주에서 예정일과 이번 계획수량을 입력해 일일 시트를 추가합니다.','진행/종료/전체를 선택하고 품번·납기·번호로 찾습니다.','공정·배정에서 공정별 설비와 작업자를 확인합니다.','LOT·품번·지시수량 확인 후 배포하고 Routing Sheet를 출력합니다.','실적이 생긴 경로는 임의 덮어쓰기하지 말고 정해진 개정 절차를 사용합니다.'],
+ routing:['방산은 수주 전량으로 배포합니다. 민수는 일일 작업지시를 발행합니다. 순서 무관으로 지정한 공정은 앞 공정 완료 전에도 작업과 실적 등록이 가능합니다.','진행/종료/전체를 선택하고 품번·납기·번호로 찾습니다.','공정·배정에서 공정별 설비와 작업자를 확인합니다.','LOT·품번·지시수량 확인 후 배포하고 Routing Sheet를 출력합니다.','실적이 생긴 경로는 임의 덮어쓰기하지 말고 정해진 개정 절차를 사용합니다.'],
  instructions:['배포된 작업지시를 검색합니다.','품번·생산오더·설비·작업자를 기준으로 대상 작업을 찾습니다.','상세와 출력으로 지시내용을 확인합니다. 작업자는 본인 배정작업만 처리합니다.'],
  workCards:['Routing을 선택하여 작업일보 사전양식을 출력합니다.','미리 채워진 공정·설비·작업자·지시수량을 확인합니다.','작업자가 작업일자를 선택하고 날짜별 시작·종료 실적을 기록합니다. 출력만으로 실적이 저장되지 않습니다.'],
- touchWork:['민수 현장 바로 시작은 상단의 민수 현장 작업 시작에서 공정과 실제 설비를 선택하세요.','로그인 후 본인 작업카드에서 품번·공정·설비를 확인합니다.','실제 작업을 시작할 때 작업 시작을 누릅니다.','당일·부분 작업을 마치면 작업 종료를 선택하고 실제 수량을 입력합니다.','지시량을 모두 처리했을 때 공정 완료를 선택합니다. 저장 전 시간·총량·불량을 확인합니다.'],
+ touchWork:['민수 현장 설비 선택 방식은 「민수 현장 작업 시작」 또는 「민수 현장 수기 작업일보」에서 발행된 공정과 실제 설비를 고릅니다.','로그인 후 본인 작업카드에서 품번·공정·설비를 확인합니다.','실제 작업을 시작할 때 작업 시작을 누릅니다.','당일·부분 작업을 마치면 작업 종료를 선택하고 실제 수량을 입력합니다.','지시량을 모두 처리했을 때 공정 완료를 선택합니다. 저장 전 시간·총량·불량을 확인합니다.'],
  voiceWork:['먼저 본인에게 배정된 작업을 선택합니다.','회사에서 허용한 음성처리 안내를 확인하고 마이크를 활성화합니다.','작업 시작 또는 작업 완료, 총수량 100개, 불량 2개처럼 짧게 말합니다.','인식문과 숫자를 확인·수정한 후 저장합니다. 음성만으로 자동 저장되지 않습니다.','인식이 어렵거나 지원되지 않으면 터치 작업입력을 이용합니다.'],
  worklogs:['본인 또는 허용된 담당범위의 작업일보를 조회합니다.','시작·종료시각, 공정, 수량과 상태를 확인합니다.','수량 확인대기는 정확한 수량을 입력하여 확정합니다.','잘못된 확정 실적은 관리자에게 사유 정정·취소를 요청합니다. 임의 중복등록하지 않습니다.'],
  purchase:['구매의뢰서 작성에서 품명 일부를 입력하면 기존 품목을 선택할 수 있고, 규격도 선택하거나 직접 입력할 수 있습니다.','참고 구매처와 예상 단가는 공란으로 상신할 수 있습니다. 구매담당자는 확인란에 자동 표시되며 결재자는 따로 선택합니다.','승인된 구매의뢰 1건당 발주서 1건을 발행합니다. 구매 문서는 인쇄에서 PDF로 저장하거나 이미지로 공유할 수 있습니다.'],
@@ -52,5 +52,5 @@ export const TECH_HELP=`<details class="help-technical"><summary>설치·복구 
 <p>실제 사내 계정·Supabase·Netlify·휴대폰 환경에서 검증이 필요합니다. 자세한 기술 점검은 제공한 docs/BACKUP_SECURITY_v4_4.md를 참고하세요.</p></details>`;
 export function showHelp(page,role){
  const steps=PAGE_HELP[page]||HELP[page]||['조회조건과 검색어를 입력합니다.','필요한 자료를 선택하고 허용된 등록·수정 기능을 사용합니다.','저장 후 목록에서 처리 결과를 확인합니다.'];
- return modal((NAV_LABELS[page]||'프로그램')+' 사용방법',`<div class="help-tabs"><a class="manual-link" href="manuals/DNM_MES_v4_9_3_Quick_Guide_KO.pdf" target="_blank" rel="noopener">방산·민수 생산과 육안검사 안내 (PDF)</a>${role==='admin'?'<a class="manual-link" href="manuals/admin.html" target="_blank" rel="noopener">관리자 운영 매뉴얼</a>':''}<a class="manual-link" href="manuals/worker.html" target="_blank" rel="noopener">현장 사용자 매뉴얼</a></div><ol class="help-list">${steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>${role==='admin'?TECH_HELP+(lastError()?'<details class="help-technical"><summary>최근 오류 · 담당자 확인용</summary><p>'+esc(lastError())+'</p></details>':''):''}`);
+ return modal((NAV_LABELS[page]||'프로그램')+' 사용방법',`<div class="help-tabs"><a class="manual-link" href="manuals/DNM_MES_v4_9_4_Quick_Guide_KO.pdf" target="_blank" rel="noopener">방산·민수 생산과 육안검사 안내 (PDF)</a>${role==='admin'?'<a class="manual-link" href="manuals/admin.html" target="_blank" rel="noopener">관리자 운영 매뉴얼</a>':''}<a class="manual-link" href="manuals/worker.html" target="_blank" rel="noopener">현장 사용자 매뉴얼</a></div><ol class="help-list">${steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>${role==='admin'?TECH_HELP+(lastError()?'<details class="help-technical"><summary>최근 오류 · 담당자 확인용</summary><p>'+esc(lastError())+'</p></details>':''):''}`);
 }
