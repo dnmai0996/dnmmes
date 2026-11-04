@@ -8,10 +8,10 @@ export const GROUPS=[
  ['구매관리',['purchase','receipts','settlement']],
  ['품질관리',['quality','documents']],
  ['설비·계측관리',['equipment','instruments']],
- ['기준정보',['products','materials','employees','processes','customers','suppliers','templates','catalog']],
+ ['기준정보',['equipmentRegister','products','materials','employees','processes','customers','suppliers','templates','catalog']],
  ['초기구축·운영',['seedData','workforceSetup','sourceReview','sourceOrders','routeCandidates','archives','notes','profiles','access','audit','backup','home']]
 ];
-export const PAGE_MODULE={instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
+export const PAGE_MODULE={equipmentRegister:'equipment',instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
 export const ADMIN_PAGES=new Set(['seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
 export function permit(ctx,module,action='read'){
  if(!ctx?.profile?.active)return false;if(ctx.profile.role==='admin')return true;
@@ -32,7 +32,7 @@ export function permissionPreset(name){
  return acl;
 }
 const CREATE={newOrder:'orders',importOrders:'orders',newRouting:'routing',start:'worklogs',manual:'worklogs',newPurchase:'purchase',newPurchaseCatalog:'purchase',addPayment:'settlement',receive:'receipts',returnReceipt:'receipts',settle:'settlement',quality:'quality',newQuality:'quality',ship:'quality',customerReturn:'quality',returnCustomer:'quality',newProduct:'products',newPartner:'partners',newTemplate:'templates',newExtra:'kind',newMaster:'kind',importMaster:'kind'};
-const UPDATE={editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
+const UPDATE={voidDaily:'routing',editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
 export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employee:'employees',assignment:'assignments',route_template:'templates',route_candidate:'templates',catalog:'catalog',material_master:'materials',process_master:'processes',quality_doc:'documents',products:'products'};
 export function actionRule(action,id,page,record){
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
