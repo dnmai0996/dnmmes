@@ -46,6 +46,7 @@ export class PortalApi{
   if(r.status===401&&auth&&retry){await this.refresh();return this.request(path,{method,body,headers,auth,retry:false});}
   if(!r.ok){
    let msg=data?.msg||data?.message||data?.error_description||'요청을 처리하지 못했습니다.';
+   if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v495_'))msg='구매 변경 기능의 database/26_upgrade_v4_9_5.sql 적용 여부를 확인하세요.';
    if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v494_'))msg='4.9.4 공정 순서 기능을 확인하세요. 기존 4.9.3 프로젝트에는 database/25_upgrade_v4_9_4.sql을 적용해야 합니다.';
    if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v493_'))msg='4.9.3 생산관리 기능을 찾을 수 없습니다. 관리자에게 database/24_upgrade_v4_9_3.sql 적용 여부를 확인하세요.';
    if(data?.code==='23505')msg='같은 코드가 이미 등록되어 있습니다.';

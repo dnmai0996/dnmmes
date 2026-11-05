@@ -21,3 +21,5 @@
 .purchase-suggestions>.muted{flex-basis:100%}
 .purchase-suggestions button{background:white;color:#173b55;border:1px solid #9ebbd0;text-align:left;white-space:normal}
 .purchase-suggestions small{display:block;color:#8b5310}
+
+.po-remark {min-width:9rem;display:grid;gap:.3rem}.po-remark textarea {min-width:8rem;width:100%;resize:vertical}.po-remark button {justify-self:start}.po-remark-text {white-space:pre-wrap;overflow-wrap:anywhere}

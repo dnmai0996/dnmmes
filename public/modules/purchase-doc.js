@@ -1,16 +1,17 @@
 // Printable DNM source-aligned documents: 구매의뢰서/견적의뢰서/발주서.
 // PDF: browser print "Save as PDF". PNG: generated locally; no file uploaded to external servers.
 import {esc,num} from './ui.js';
-import {seoulDate} from './purchase-utils.js';
+import {seoulDate,poLabel} from './purchase-utils.js';
 const types={request:'구매의뢰서',quote:'견적의뢰서',order:'발주서'};
 const KRW=v=>Number(v||0).toLocaleString('ko-KR',{maximumFractionDigits:2});
-export const purchaseDocName=(r,type)=>`${types[type]||'구매문서'}_${String(type==='order'?r.data?.po_no:type==='quote'?r.data?.quote_request?.quote_no:r.code||'').replace(/[^a-zA-Z0-9가-힣_.-]/g,'_')||'미발급'}`;
+const orderTitle=d=>d?.po_issue_type==='revise'?'수정 발주서':d?.po_issue_type==='reissue'?'재발주서':'발주서';
+export const purchaseDocName=(r,type)=>`${types[type]||'구매문서'}_${String(type==='order'?poLabel(r.data):type==='quote'?r.data?.quote_request?.quote_no:r.code||'').replace(/[^a-zA-Z0-9가-힣_.-]/g,'_')||'미발급'}`;
 export function purchaseDocData(r,type){
  const d=type!=='order'&&r.data?.request_terms?{...r.data,...r.data.request_terms}:r.data||{},q=d.quote_request||{},lines=d.lines||[];
- const number=type==='request'?r.code:type==='quote'?q.quote_no:d.po_no;
+ const number=type==='request'?r.code:type==='quote'?q.quote_no:poLabel(d);
  if(!types[type]||!number)throw Error('발행된 문서를 선택하세요.');
  const issue=type==='request'?String(r.created_at||'').slice(0,10):type==='quote'?q.issued_date:d.po_date;
- return {type,title:types[type],number,issue:issue||seoulDate(),recipient:d.supplier||r.title||'',subject: type==='request'?'아래 품목의 구매를 의뢰합니다.':type==='quote'?'아래 품목에 대한 견적을 의뢰합니다.':'아래와 같이 발주합니다.',lines,notes:type==='request'?d.note:type==='quote'?q.note:d.po_note,requestedBy:r.created_by,delivery:type==='quote'?q.response_due:type==='order'?d.po_delivery_date:d.due_date,subtotal:Number(d.subtotal||0),tax:Number(d.tax||0),total:Number(d.total||0)};
+ return {type,title:type==='order'?orderTitle(d):types[type],number,issue:issue||seoulDate(),recipient:d.supplier||r.title||'',subject: type==='request'?'아래 품목의 구매를 의뢰합니다.':type==='quote'?'아래 품목에 대한 견적을 의뢰합니다.':'아래와 같이 발주합니다.',lines,notes:type==='request'?d.note:type==='quote'?q.note:d.po_note,requestedBy:r.created_by,delivery:type==='quote'?q.response_due:type==='order'?d.po_delivery_date:d.due_date,subtotal:Number(d.subtotal||0),tax:Number(d.tax||0),total:Number(d.total||0)};
 }
 export function purchaseDocumentMarkup(r,type){
  const d=purchaseDocData(r,type),isQuote=type==='quote';
