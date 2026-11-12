@@ -1,0 +1,88 @@
+.civil-routing-print { display: none; }
+@page civil-routing { size: A4 portrait; margin: 7mm; }
+@media print {
+  #printArea.civil-routing-print {
+    display: block !important;
+    padding: 0 !important;
+    background: white;
+    color: #111;
+    font: 8pt/1.2 "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
+  }
+  .civil-routing-print .civil-page {
+    page: civil-routing;
+    width: 196mm;
+    break-after: page;
+    page-break-after: always;
+  }
+  .civil-routing-print .civil-page:last-child { break-after: auto; page-break-after: auto; }
+  .civil-routing-print .civil-title {
+    border: 1px solid #111;
+    border-bottom: 0;
+    display: grid;
+    grid-template-columns: 35% 65%;
+    align-items: center;
+    min-height: 10mm;
+    padding: 0 2mm;
+  }
+  #printArea.civil-routing-print h1 { margin: 0; font-size: 21pt; font-weight: 750; letter-spacing: .2mm; }
+  .civil-routing-print .civil-document-code { font-size: 8pt; overflow-wrap: anywhere; }
+  .civil-routing-print .civil-lot-svg { display: block; max-width: 100%; }
+  .civil-routing-print .civil-wide-barcode { grid-template-columns: 1fr; padding-top: 1mm; }
+  .civil-routing-print .civil-wide-barcode h1 { text-align: center; }
+  #printArea.civil-routing-print table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    border: 1px solid #111;
+    border-radius: 0;
+    margin: 0;
+    font-size: 8pt;
+  }
+  #printArea.civil-routing-print th, #printArea.civil-routing-print td {
+    border: 1px solid #333;
+    padding: .7mm .5mm !important;
+    vertical-align: middle;
+    text-align: center;
+    background: white !important;
+    color: #111;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    max-width: none;
+    font-size: 8pt;
+  }
+  .civil-routing-print .civil-meta .civil-label { width: 13.4%; }
+  .civil-routing-print .civil-meta .civil-value { width: 19.933%; }
+  .civil-routing-print .civil-meta td { height: 7mm; }
+  .civil-routing-print .civil-meta th { font-size: 7pt !important; font-weight: 500; }
+  #printArea.civil-routing-print .civil-steps { margin-top: 2mm; }
+  .civil-routing-print .civil-steps thead { display: table-header-group; }
+  .civil-routing-print .civil-steps th { height: 8mm; font-size: 7pt !important; }
+  .civil-routing-print .civil-steps small { font-size: 6pt; }
+  .civil-routing-print .civil-steps td { height: 8.4mm; }
+  .civil-routing-print .civil-steps .civil-job { text-align: left !important; }
+  .civil-routing-print .civil-steps .civil-skl { vertical-align: middle; }
+  .civil-routing-print .civil-col-skl { width: 4%; }
+  .civil-routing-print .civil-col-code { width: 9%; }
+  .civil-routing-print .civil-col-name { width: 18%; }
+  .civil-routing-print .civil-col-machine { width: 13%; }
+  .civil-routing-print .civil-col-job { width: 20%; }
+  .civil-routing-print .civil-col-check { width: 5%; }
+  .civil-routing-print .civil-col-qty { width: 6%; }
+  .civil-routing-print .civil-col-date { width: 11%; }
+  .civil-routing-print .civil-col-worker { width: 8%; }
+  .civil-routing-print .civil-col-inspector { width: 6%; }
+  .civil-routing-print .civil-revision .civil-rev-number { width: 13%; }
+  .civil-routing-print .civil-revision .civil-rev-content { width: 31%; }
+  .civil-routing-print .civil-revision .civil-rev-date { width: 20%; }
+  .civil-routing-print .civil-revision th { font-size: 6.6pt !important; font-weight: 500; }
+  .civil-routing-print .civil-revision td { height: 4.7mm; font-size: 7pt !important; }
+  .civil-routing-print .civil-footer { display: flex; justify-content: space-between; margin-top: 2mm; font-size: 8pt; }
+  .civil-routing-print .civil-source-note { margin: 1.5mm 0 0; font-size: 6.3pt; }
+  .civil-routing-print .civil-terminated { margin: 1mm 0; padding: 1mm; border: 1px solid #111; font-size: 8pt; font-weight: 700; }
+  .civil-routing-print .civil-route-note { margin: 2mm 0 0; font-size: 7pt; white-space: pre-wrap; }
+  .civil-routing-print .civil-detail { page: civil-routing; font-size: 9pt; }
+  .civil-routing-print .civil-detail h2 { font-size: 14pt; }
+  .civil-routing-print .civil-detail h3 { font-size: 10pt; break-after: avoid; }
+  .civil-routing-print .civil-detail p { white-space: pre-wrap; overflow-wrap: anywhere; }
+}

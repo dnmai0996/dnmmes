@@ -2,7 +2,7 @@
 export const ORDER_FIELDS=[['po_no','PO 번호'],['part_no','자재코드'],['part_name','자재명'],['grade_code','등급코드'],['qty','발주수량'],['received_qty','입고수량'],['unit_price','발주단가'],['order_amount','발주금액'],['order_date','발주일자'],['due_date','납기일자'],['production_no','생산오더'],['project','Project내역']];
 const collator=new Intl.Collator('ko',{numeric:true,sensitivity:'base'});
 export function routingSort(a,b){return collator.compare(a.data?.part_no||a.code||'',b.data?.part_no||b.code||'')||String(a.data?.due_date||'9999-12-31').localeCompare(b.data?.due_date||'9999-12-31')||collator.compare(a.code||'',b.code||'');}
-export function routeBucket(r){return r.state==='DONE'?'closed':['DRAFT','RELEASED'].includes(r.state)?'open':'history';}
+export function routeBucket(r){return ['DONE','TERMINATED'].includes(r.state)?'closed':['DRAFT','RELEASED'].includes(r.state)?'open':'history';}
 export function templateMatch(order,templates){
  const part=String(order.data?.part_no||order.part_no||'').trim();
  const matched=templates.filter(t=>(t.data?.part_no||t.code)===part && t.state!=='INACTIVE' && t.data?.active!==false);
@@ -30,9 +30,10 @@ export function workerTaskStatus(op,logs,profileId){
  const code=op.state==='DONE'?'DONE':active?'ACTIVE':pending?'PENDING':last?.state==='PAUSED'?'PAUSED':confirmed.length?'PARTIAL':'ASSIGNED';
  return {code,label:WORK_STATES[code],active,pending,last,logs:mine,personalQty,days:[...new Set(mine.map(l=>l.data?.work_date).filter(Boolean))].length,pausedCount:pauses.length};
 }
-export function workerAssignedOperations(routes,operations,profileId,scope='mine'){
+export function workerAssignedOperations(routes,operations,profileId,scope='mine',logs=[]){
+ const actual=new Set(logs.filter(l=>l.data?.profile_id===profileId&&l.state!=='CANCELLED').map(l=>l.parent_id));
  const visible=new Set(routes.filter(r=>['RELEASED','DONE'].includes(r.state)).map(r=>r.id));
- return operations.filter(op=>visible.has(op.parent_id) && (scope==='all' || op.data?.profile_id===profileId || op.data?.profile_ids?.includes(profileId)))
+ return operations.filter(op=>visible.has(op.parent_id) && (scope==='all' || op.data?.profile_id===profileId || op.data?.profile_ids?.includes(profileId) || actual.has(op.id)))
  .sort((a,b)=>String(a.data?.due_date||'').localeCompare(String(b.data?.due_date||''))||routingSort(a,b));
 }
 export function blankStep(i=1){return{code:String(i*10).padStart(3,'0'),name:'',kind:'WORK',note:'',inspection_code:'M',equipment_id:'',employee_id:'',equipment_label:''};}

@@ -3,7 +3,7 @@ export const MODULES={dashboard:'작업진척 대시보드',orders:'고객수주
 // Dashboard is a standalone entry; group visibility still uses the existing database ACL.
 export const TOP_PAGES=['dashboard'];
 export const GROUPS=[
- ['수주관리',['orders','routing']],
+ ['수주관리',['orders','routing','civilRouting','civilResults']],
  ['생산관리',['instructions','workCards','touchWork','voiceWork','worklogs']],
  ['구매관리',['purchase','receipts','settlement']],
  ['품질관리',['quality','documents']],
@@ -11,7 +11,7 @@ export const GROUPS=[
  ['기준정보',['equipmentRegister','products','materials','employees','processes','customers','suppliers','templates','catalog']],
  ['초기구축·운영',['seedData','workforceSetup','sourceReview','sourceOrders','routeCandidates','archives','notes','profiles','access','audit','backup','home']]
 ];
-export const PAGE_MODULE={equipmentRegister:'equipment',instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
+export const PAGE_MODULE={civilRouting:'routing',civilResults:'routing',equipmentRegister:'equipment',instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
 export const ADMIN_PAGES=new Set(['seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
 export function permit(ctx,module,action='read'){
  if(!ctx?.profile?.active)return false;if(ctx.profile.role==='admin')return true;
@@ -31,10 +31,11 @@ export function permissionPreset(name){
  if(name==='master'){for(const m of ['products','materials','employees','processes','equipment','instruments','customers','suppliers','templates','assignments','catalog'])set(m,true);set('archives');set('notes',true);}
  return acl;
 }
-const CREATE={newOrder:'orders',importOrders:'orders',newRouting:'routing',start:'worklogs',manual:'worklogs',newPurchase:'purchase',newPurchaseCatalog:'purchase',addPayment:'settlement',receive:'receipts',returnReceipt:'receipts',settle:'settlement',quality:'quality',newQuality:'quality',ship:'quality',customerReturn:'quality',returnCustomer:'quality',newProduct:'products',newPartner:'partners',newTemplate:'templates',newExtra:'kind',newMaster:'kind',importMaster:'kind'};
-const UPDATE={cancelPO:'receipts',revisePO:'receipts',sequenceSetting:'routing',voidDaily:'routing',editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
+const CREATE={newCivilOrder:'orders',fieldStart:'worklogs',fieldManual:'worklogs',newOrder:'orders',importOrders:'orders',newRouting:'routing',start:'worklogs',manual:'worklogs',newPurchase:'purchase',newPurchaseCatalog:'purchase',addPayment:'settlement',receive:'receipts',returnReceipt:'receipts',settle:'settlement',quality:'quality',newQuality:'quality',ship:'quality',customerReturn:'quality',returnCustomer:'quality',newProduct:'products',newPartner:'partners',newTemplate:'templates',newExtra:'kind',newMaster:'kind',importMaster:'kind'};
+const UPDATE={markCivilOrder:'orders',cancelPO:'receipts',revisePO:'receipts',sequenceSetting:'routing',voidDaily:'routing',editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
 export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employee:'employees',assignment:'assignments',route_template:'templates',route_candidate:'templates',catalog:'catalog',material_master:'materials',process_master:'processes',quality_doc:'documents',products:'products'};
 export function actionRule(action,id,page,record){
+ if(action.startsWith('civil:')){const name=action.slice(6);return {module:'routing',action:name==='new'?'create':['quantity','cancel','terminate'].includes(name)?'update':'read'};}
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
  if(['templateForOrder','templateForProduct','useCandidate'].includes(action))return {module:'templates',action:'write'};
  if(action==='bulkUseMaster')return {module:'products',action:'write'};

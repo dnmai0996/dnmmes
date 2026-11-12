@@ -1,0 +1,87 @@
+.civil-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.civil-lot-preview {
+  max-height: 340px;
+  overflow: auto;
+  margin: 12px 0;
+  border: 1px solid #dce6ee;
+  border-radius: 12px;
+}
+
+.civil-lot-preview label {
+  margin: 0;
+  min-width: 145px;
+}
+
+.civil-lot-preview input {
+  max-width: 200px;
+}
+
+.civil-lot-preview thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #eff5fa;
+}
+
+.civil-step-editor .step-card > .muted {
+  display: none;
+}
+
+.civil-process-table td,
+.civil-process-table th {
+  min-width: 120px;
+  vertical-align: top;
+}
+
+.civil-process-table td:first-child,
+.civil-process-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  min-width: 190px;
+}
+
+.civil-process-table th:first-child {
+  z-index: 2;
+  background: #eff5fa;
+}
+
+.civil-process-table td strong {
+  display: inline-block;
+  padding-bottom: 5px;
+  font-size: 18px;
+}
+
+.civil-page .filter-bar label {
+  max-width: 440px;
+}
+
+.p-TERMINATED {
+  color: #85391c;
+  background: #fff0e6;
+}
+
+@media (max-width: 700px) {
+  .civil-page .vtoolbar .actions {
+    width: 100%;
+  }
+  .civil-page .vtoolbar .actions button {
+    width: 100%;
+  }
+  .civil-preview-header button {
+    width: 100%;
+  }
+  .civil-process-table td:first-child,
+  .civil-process-table th:first-child {
+    position: static;
+    min-width: 150px;
+  }
+}
