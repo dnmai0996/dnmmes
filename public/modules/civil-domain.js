@@ -44,7 +44,7 @@ export function splitCivilLots(total, perLot, prefix = '') {
   const quantity = positiveInteger(total, '계획수량');
   const size = positiveInteger(perLot, 'LOT당 수량');
   const count = Math.ceil(quantity / size);
-  if (count > 200) throw Error('한 번에 생성할 수 있는 LOT는 최대 200개입니다. LOT당 수량을 늘리세요.');
+  if (count > 500) throw Error('한 번에 생성할 수 있는 LOT는 최대 500개입니다. LOT당 수량을 늘리세요.');
   return Array.from({length: count}, (_, index) => ({
     lot: prefix ? prefix.trim() + '-' + String(index + 1).padStart(3, '0') : '',
     qty: Math.min(size, quantity - index * size)
@@ -52,7 +52,7 @@ export function splitCivilLots(total, perLot, prefix = '') {
 }
 
 export function validateCivilLots(lots, remaining) {
-  if (!Array.isArray(lots) || !lots.length || lots.length > 200) throw Error('LOT를 1~200개 작성하세요.');
+  if (!Array.isArray(lots) || !lots.length || lots.length > 500) throw Error('LOT를 1~500개 작성하세요.');
   const cleaned = lots.map((lot, i) => ({...lot, lot: String(lot.lot || '').trim(), qty: positiveInteger(lot.qty, (i + 1) + '번째 LOT 수량')}));
   const names = cleaned.map(lot => lot.lot).filter(Boolean);
   if (names.length !== new Set(names).size) throw Error('LOT 번호가 중복되었습니다. 각 LOT 번호를 확인하세요.');

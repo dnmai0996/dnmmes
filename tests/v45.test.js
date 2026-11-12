@@ -51,7 +51,7 @@ test('done routing operation remains visible for worker history',()=>{
 });
 test('user-facing menu moves master templates away from customer order',()=>{
  const nav=Object.fromEntries(GROUPS);
- assert.deepEqual(nav['수주관리'],['orders','routing']);
+ assert.deepEqual(nav['수주관리'],['orders','routing','civilRouting','civilResults']);
  assert.ok(nav['기준정보'].includes('templates'));
  assert.ok(!nav['초기구축·운영'].includes('routingSetup'));
 });
@@ -85,4 +85,16 @@ test('order form opens Routing directly, and worker finish form asks for work da
 test('fixed equipment-worker master binding is absent from setup form',()=>{
  const section=master.split('async workforceSetup(){')[1].split('async routeCandidates(){')[0];
  assert.doesNotMatch(section,/가능 공정명|assignProcesses|assignment['",]/);
+});
+
+test('substitute actual work remains visible without rewriting the planned worker',()=>{
+ const operations=[fixture('op-1'),fixture('op-2')];
+ const logs=[log('actual-log','ACTIVE','substitute','2026-11-12')];
+ const snapshot=structuredClone(operations);
+ assert.deepEqual(workerAssignedOperations(route,operations,'substitute','mine',logs).map(row=>row.id),['op-1']);
+ assert.equal(workerTaskStatus(operations[0],logs,'substitute').active.id,'actual-log');
+ assert.deepEqual(workerAssignedOperations(route,operations,'unrelated','mine',logs),[]);
+ assert.deepEqual(workerAssignedOperations([{id:'routing-1',state:'TERMINATED'}],operations,'substitute','mine',logs),[]);
+ assert.deepEqual(workerAssignedOperations(route,operations,'substitute','mine',[{...logs[0],state:'CANCELLED'}]),[]);
+ assert.deepEqual(operations,snapshot);
 });

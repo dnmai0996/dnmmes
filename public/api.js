@@ -33,7 +33,7 @@ export class PortalApi{
   if(auth)h.Authorization='Bearer '+this.session.access_token;
   if(body!==undefined)h['Content-Type']='application/json';
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),20000);
+  const timeout=setTimeout(()=>controller.abort(),path==='/rest/v1/rpc/dnm_v410_split'?120000:20000);
   let r,text;
   try{
    r=await this.fetcher(this.c.url+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:controller.signal});
@@ -46,6 +46,7 @@ export class PortalApi{
   if(r.status===401&&auth&&retry){await this.refresh();return this.request(path,{method,body,headers,auth,retry:false});}
   if(!r.ok){
    let msg=data?.msg||data?.message||data?.error_description||'요청을 처리하지 못했습니다.';
+   if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v4101_'))msg='4.10.1 기능 설치가 필요합니다. 관리자에게 database/28_upgrade_v4_10_1.sql 적용 여부를 확인하세요.';
    if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v410_'))msg='민수 LOT 기능 설치가 필요합니다. 관리자에게 database/27_upgrade_v4_10_0.sql 적용 여부를 확인하세요.';
    if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v495_'))msg='구매 변경 기능의 database/26_upgrade_v4_9_5.sql 적용 여부를 확인하세요.';
    if(r.status===404&&path.startsWith('/rest/v1/rpc/dnm_v494_'))msg='4.9.4 공정 순서 기능을 확인하세요. 기존 4.9.3 프로젝트에는 database/25_upgrade_v4_9_4.sql을 적용해야 합니다.';

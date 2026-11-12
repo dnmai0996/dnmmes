@@ -26,5 +26,63 @@ test('seed importer excludes production events from whitelist',()=>{const fn=sql
 test('draft creation carries original optimistic versions',()=>{const f=sql.split('FUNCTION public.dnm_v42_create_drafts(')[1];assert.match(f,/'template_id',tpl.id,'template_version',tpl.version/);assert.match(f,/'order_version',o.version/);assert.match(f,/기존 Routing 보존/);});
 test('own-record checks return false for null mappings',()=>{assert.match(sql,/SELECT coalesce\(CASE WHEN k='employee'/);assert.match(sql,/ELSE owner=auth.uid\(\) END,false\)/);});
 test('ACL included in backup and private helper execute revoked',()=>{assert.match(sql,/'module_access'/);assert.match(sql,/pronamespace='dnm_private'::regnamespace/);});
-test('UI wiring retains fetch fix and config is not shipped',()=>{const api=readFileSync(new URL('../public/api.js',import.meta.url),'utf8');assert.match(api,/globalThis.fetch\(\.\.\.args\)/);const app=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');assert.match(app,/V46Controller/);assert.doesNotMatch(app,/expandNav|collapseNav/);assert.match(app,/renderNavigation/);assert.match(app,/refreshContext/);});
+test('UI wiring retains fetch binding and authorized navigation',()=>{const api=readFileSync(new URL('../public/api.js',import.meta.url),'utf8');assert.match(api,/globalThis.fetch\(\.\.\.args\)/);const app=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');assert.match(app,/V4101Controller as MesController/);assert.doesNotMatch(app,/expandNav|collapseNav/);assert.match(app,/renderNavigation/);assert.match(app,/refreshContext/);});
 test('batch importer stable keys and no automatic work creation',()=>{const js=readFileSync(new URL('../public/modules/v42.js',import.meta.url),'utf8');assert.match(js,/this.seedHash\+JSON.stringify\(chunk\)/);assert.match(js,/i\+=100/);assert.match(js,/database_written|실적이 생성되지|실적을 생성하지/);});
+
+test('civil pages reuse routing read permission without granting mutations',()=>{
+ const c=ctx('member','none');
+ for(const page of ['civilRouting','civilResults'])assert.equal(pageAllowed(c,page),false);
+ c.permissions.routing={read:true,create:false,update:false,scope:'own'};
+ for(const page of ['civilRouting','civilResults'])assert.equal(pageAllowed(c,page),true);
+ for(const action of ['detail','print','results','export'])assert.equal(actionAllowed(c,'civil:'+action,'lot','civilRouting'),true);
+ for(const action of ['new','quantity','cancel','terminate'])assert.equal(actionAllowed(c,'civil:'+action,'lot','civilRouting'),false);
+ assert.equal(actionAllowed(c,'newCivilOrder','','orders'),false);
+});
+
+test('civil create and update permissions remain independent',()=>{
+ const c=ctx('member','none');
+ c.permissions.routing={read:true,create:true,update:false,scope:'own'};
+ assert.equal(actionAllowed(c,'civil:new','','civilRouting'),true);
+ for(const action of ['quantity','cancel','terminate'])assert.equal(actionAllowed(c,'civil:'+action,'lot','civilRouting'),false);
+ c.permissions.routing={read:true,create:false,update:true,scope:'own'};
+ assert.equal(actionAllowed(c,'civil:new','','civilRouting'),false);
+ for(const action of ['quantity','cancel','terminate'])assert.equal(actionAllowed(c,'civil:'+action,'lot','civilRouting'),true);
+ c.permissions.routing.read=false;
+ for(const page of ['civilRouting','civilResults'])assert.equal(pageAllowed(c,page),false);
+ assert.equal(actionAllowed(c,'civil:quantity','lot','civilRouting'),false);
+});
+
+test('civil order and actual-work actions obey their own module permissions',()=>{
+ const c=ctx('member','none');
+ c.permissions.orders={read:true,create:true,update:false,scope:'own'};
+ assert.equal(actionAllowed(c,'newCivilOrder','','orders'),true);
+ assert.equal(actionAllowed(c,'civil:new','','civilRouting'),false);
+ assert.equal(actionAllowed(c,'fieldStart','','touchWork'),false);
+ c.permissions.worklogs={read:true,create:true,update:false,scope:'own'};
+ assert.equal(actionAllowed(c,'fieldStart','','touchWork'),true);
+ assert.equal(actionAllowed(c,'fieldManual','','touchWork'),true);
+ assert.equal(actionAllowed(c,'stopLog','log','touchWork'),false);
+ c.permissions.worklogs={read:true,create:false,update:true,scope:'own'};
+ assert.equal(actionAllowed(c,'fieldStart','','touchWork'),false);
+ assert.equal(actionAllowed(c,'stopLog','log','touchWork'),true);
+});
+
+test('viewer and inactive accounts cannot mutate civil records',()=>{
+ const c=ctx('viewer','production');
+ assert.equal(pageAllowed(c,'civilRouting'),true);
+ for(const action of ['civil:new','civil:quantity','civil:cancel','civil:terminate','newCivilOrder','fieldStart']){
+  assert.equal(actionAllowed(c,action,'lot','civilRouting'),false);
+ }
+ c.profile={id:'test-user',role:'admin',active:false};
+ assert.equal(pageAllowed(c,'civilRouting'),false);
+ assert.equal(actionAllowed(c,'civil:terminate','lot','civilRouting'),false);
+});
+
+test('current controller inherits purchasing and prior production behavior',async()=>{
+ const [{V410Controller},{V493Controller},{V46Controller}]=await Promise.all([
+  import('../public/modules/v410.js'),import('../public/modules/v493.js'),import('../public/modules/v46.js')
+ ]);
+ assert.equal(Object.getPrototypeOf(V410Controller.prototype),V493Controller.prototype);
+ assert.equal(Object.getPrototypeOf(V493Controller.prototype),V46Controller.prototype);
+ assert.equal(V410Controller.prototype.purchase,V46Controller.prototype.purchase);
+});

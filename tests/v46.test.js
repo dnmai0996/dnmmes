@@ -73,5 +73,5 @@ test('existing purchase_submit and receipt commands remain in delegated v4.5 imp
 test('route UI explains missing equipment and offers admin activation',()=>{
  assert.match(editor,/설비.*사용 중/);assert.match(editor,/기준정보 검토·활성화/);
  assert.match(ui,/goEquipmentActivation/);
- assert.match(app,/V46Controller/);
+ assert.match(app,/V4101Controller as MesController/);
 });

@@ -1,5 +1,7 @@
 -- DNM MES 4.10.0. Run AFTER 26_upgrade_v4_9_5.sql in the existing project.
 -- Additive, retry-safe upgrade. Business rows are retained, including cancelled LOTs.
+-- SQL27 revision 2 (2026-11-12): accept both LF and Windows CRLF paste formats.
+-- Existing leave-management tables, employee-number links and sync settings are retained.
 BEGIN;
 SELECT pg_advisory_xact_lock(164040,1);
 DO $$ BEGIN
@@ -166,6 +168,10 @@ CREATE OR REPLACE FUNCTION pg_temp.patch410(fn regprocedure,before_text text,aft
 LANGUAGE plpgsql AS $$
 DECLARE src text:=replace(pg_get_functiondef(fn),E'\r\n',E'\n');
 BEGIN
+ -- Dollar-quoted patch arguments retain the pasted file's line endings.
+ -- Compare all three strings in the same form; retain the exact-match guard.
+ before_text:=replace(before_text,E'\r\n',E'\n');
+ after_text:=replace(after_text,E'\r\n',E'\n');
  IF strpos(src,after_text)>0 THEN RETURN; END IF;
  IF (length(src)-length(replace(src,before_text,'')))/length(before_text)<>1 THEN
   RAISE EXCEPTION '설치된 함수 %가 4.9.5 예상 버전과 다릅니다. 업데이트 전체를 중단합니다.',fn;

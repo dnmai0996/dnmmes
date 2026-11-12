@@ -127,7 +127,7 @@ export class CivilUI {
       const lots = validateCivilLots(quantities.map(qty => ({qty})), plan.remaining);
       if (lots.reduce((sum, lot) => sum + lot.qty, 0) !== total) throw Error('LOT 수량 합계와 이번 계획수량을 같게 맞추세요.');
       const steps = editor.read();
-      if (steps.length * lots.length > 5000) throw Error('한 번에 생성되는 공정은 5,000개 이하입니다. 이번 계획수량이나 LOT 개수를 조정하세요.');
+      if (steps.length * lots.length > 30000) throw Error('한 번에 생성되는 공정은 30,000개 이하입니다. 이번 계획수량이나 LOT 개수를 조정하세요.');
       return this.save('dnm_v410_split', {p: {...form, order_id: order.id, order_version: order.version,
         total_qty: total, lot_qty: positiveInteger(form.lot_qty, 'LOT당 기본 수량'), quantities: lots.map(lot => lot.qty),
         template_id: source.id || null, template_version: source.version || null, steps}, k: key});
@@ -175,7 +175,8 @@ export class CivilUI {
     const body = `<div class="detail-grid">${[['LOT', route.data.lot || route.code], ['Shop Order', route.data.shop_order_no || route.data.shop_order || route.data.production_no], ['Heat Code', route.data.heat_code], ['품번', route.data.part_no], ['LOT 수량', num(route.data.qty)], ['상태', civilState(route)], ['완료 공정', progress.done + ' / ' + progress.ops.length], ['작업 예정일', route.data.plan_date]].map(([label, value]) => `<div><small>${esc(label)}</small><strong>${esc(value || '—')}</strong></div>`).join('')}</div>
       ${route.data.termination_reason ? notice('불량 종결 사유 · ' + route.data.termination_reason, 'warning') : ''}
       <div class="actions">${civilButton('print', '민수 Routing PDF·인쇄', id, 'primary')}${civilButton('results', '이 LOT 실적', id)}
-      ${editable ? civilButton('quantity', 'LOT 수량 수정', id) + civilButton('cancel', '미착수 취소', id) : ''}
+      ${editable ? civilButton('quantity', 'LOT 수량 수정', id) : ''}
+      ${canManage && !['CANCELLED','SUPERSEDED'].includes(route.state) ? civilButton('deleteZero', '실적 0 LOT 삭제', id) : ''}
       ${canManage && ['RELEASED', 'DONE'].includes(route.state) ? civilButton('terminate', '불량 최종종결', id) : ''}${editable && route.state === 'DRAFT' ? btn('release', '작업지시 배포', id) : ''}</div>
       ${table(['공정번호', '공정 / 작업내용', '진행 순서', '계획 설비 / 작업자', '지시 / 누적 처리', '상태', '작업'], ordered.map(operation => [
         esc(operation.data.op_code), esc(operation.title) + '<br><small>' + esc(operation.data.note || '') + '</small>', (operation.data.independent ? '순서 무관' : blocked.has(operation.id) ? '순서 준수 · 선행 대기' : '순서 준수') +
@@ -215,6 +216,8 @@ export class CivilUI {
     const civil = civilRows(routes, orders, {state: 'all'});
     const selection = civilRows(routes, orders, {query: this.main.search, state: this.state}).filter(route => !this.resultRoute || route.id === this.resultRoute);
     const logRows = civilResultRows(civil, operations, logs, {query: this.main.search, routeId: this.resultRoute, date: this.resultDate, employee: this.resultWorker});
+    if(this.main.loadLogEditStatus) await this.main.loadLogEditStatus(logRows.map(row=>row.log));
+    if (ticket !== this.ticket || this.main.page !== 'civilResults') return;
     this.visibleResults = logRows;
     const workers = [...new Set(civilResultRows(civil, operations, logs).map(row => row.log.data.employee_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
     const diary = this.resultView === 'logs';
@@ -250,11 +253,11 @@ export class CivilUI {
   }
 
   logsTable(rows) {
-    return table(['작업일 / LOT', '공정', '실제 설비 / 작업자', '시작 / 종료', '총 / 양품 / 불량', '작업시간', '상태', '관리'], this.main.pagedCells(rows, row => [
+    return table(['작업일 / LOT', '공정', '실제 설비 / 작업자', '시작 / 종료', '총 / 양품 / 불량', '작업시간', '비고', '상태', '관리'], this.main.pagedCells(rows, row => [
       esc(row.workDate) + '<br>' + civilButton('detail', row.route.data.lot || row.route.code, row.route.id), esc(row.operation.data.op_code) + ' ' + esc(row.operation.title),
       esc(row.log.data.equipment_name || row.log.data.equipment_code) + '<br>' + esc(row.log.data.employee_name), esc(clock(row.log.data.start_at)) + '<br>' + esc(clock(row.log.data.end_at)),
-      row.log.state === 'CONFIRMED' ? `${num(row.log.data.total)} / ${num(row.log.data.good)} / ${num(row.log.data.defect)}` : '미확정', esc(duration(row.log.data.minutes)), pill(row.log.state),
-      row.log.state === 'ACTIVE' && this.can('update', 'worklogs') ? btn('stopLog', '작업 종료', row.log.id) : row.log.state === 'PENDING' && this.can('update', 'worklogs') ? btn('confirmLog', '수량 확인', row.log.id) : '—'
+      row.log.state === 'CONFIRMED' ? `${num(row.log.data.total)} / ${num(row.log.data.good)} / ${num(row.log.data.defect)}` : '미확정', esc(duration(row.log.data.minutes)), esc(row.log.data.memo||''), pill(row.log.state),
+      row.log.state === 'ACTIVE' && this.can('update', 'worklogs') ? btn('stopLog', '작업 종료', row.log.id) : row.log.state === 'PENDING' && this.can('update', 'worklogs') ? btn('confirmLog', '수량 확인', row.log.id) : this.main.logEditButton?.(row.log)||'—'
     ]));
   }
 
@@ -283,10 +286,10 @@ export class CivilUI {
       closeModal();
       return this.main.go('civilResults');
     }
-    if (name === 'export') return exportCSV('DNM_민수작업일보_' + today() + '.csv', [['LOT', 'Shop Order', 'Heat Code', '품번', '작업일', '공정', '설비', '작업자', '시작', '종료', '총수량', '양품', '불량', '공수(분)', '상태'],
+    if (name === 'export') return exportCSV('DNM_민수작업일보_' + today() + '.csv', [['LOT', 'Shop Order', 'Heat Code', '품번', '작업일', '공정', '설비', '작업자', '시작', '종료', '총수량', '양품', '불량', '공수(분)', '상태', '비고'],
       ...this.visibleResults.map(({log, operation, route, workDate}) => [route.data.lot || route.code, route.data.shop_order_no || route.data.shop_order || route.data.production_no, route.data.heat_code, route.data.part_no, workDate, operation.title,
         log.data.equipment_name || log.data.equipment_code, log.data.employee_name, log.data.start_at, log.data.end_at,
-        log.state === 'CONFIRMED' ? log.data.total : '', log.state === 'CONFIRMED' ? log.data.good : '', log.state === 'CONFIRMED' ? log.data.defect : '', log.data.minutes, log.state])]);
+        log.state === 'CONFIRMED' ? log.data.total : '', log.state === 'CONFIRMED' ? log.data.good : '', log.state === 'CONFIRMED' ? log.data.defect : '', log.data.minutes, log.state, log.data.memo])]);
     throw Error('민수 화면 작업을 다시 선택하세요.');
   }
 }

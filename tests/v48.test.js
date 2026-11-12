@@ -57,7 +57,7 @@ test('Edge wrapper rejects other origins and does not disclose its keys',async()
   assert.equal(pre.status,204);assert.equal(pre.headers.get('access-control-allow-origin'),ORIGIN);
   const blocked=await handler(new Request(`${PROJECT}/functions/v1/dnm-accounts`,{method:'POST',headers:{origin:'https://evil.netlify.app'}}));assert.equal(blocked.status,403);
   const req=new Request(`${PROJECT}/functions/v1/dnm-accounts`,{method:'POST',headers:{origin:ORIGIN,apikey:'sb_publishable_TEST','Content-Type':'application/json'},body:JSON.stringify({action:'public_status',project_url:PROJECT})});
-  const response=await handler(req);assert.equal(response.status,200);assert.equal((await response.json()).version,'4.8.0');
+  const response=await handler(req);assert.equal(response.status,200);assert.equal((await response.json()).version,'4.9.0');
   assert.equal(spy.length,2);assert.ok(spy.every(x=>x.opts.headers.apikey==='sb_secret_FAKE_TEST'));
  } finally {globalThis.Deno=oldDeno;globalThis.fetch=oldFetch;}
 });
