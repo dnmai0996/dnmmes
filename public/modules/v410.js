@@ -31,9 +31,9 @@ export class V410Controller extends V493Controller {
   this.set(`<div class="card">${this.top(create?btn('newCivilOrder','민수 수주 수기등록','','primary')+btn('newOrder','방산 수주 직접등록')+btn('importOrders','방산 수주 Excel 등록'):'')}${notice('민수는 수주를 수기로 등록한 뒤 「민수 LOT 작성」에서 작업 LOT 수량으로 나눕니다. Shop Order No와 Heat Code는 각 LOT와 민수 양식에 연결됩니다.')}${table(['구분','생산오더 / Shop Order','품번 / 품명','고객 / Project','수주수량','발주일 / 납기','Heat Code','상태','관리'],this.pagedCells(rows,r=>{const civil=isCivilOrder(r)||civilIds.has(r.id);return [civil?'민수':'방산',btn('orderDetail',r.code,r.id)+'<br>'+esc(r.data.shop_order_no||''),esc(r.data.part_no)+'<br>'+esc(r.title),esc(r.data.customer)+'<br>'+esc(r.data.project),num(r.data.qty),esc(r.data.order_date||'')+'<br>'+esc(r.data.due_date||'미정'),esc(r.data.heat_code||''),pill(r.state),btn('orderDetail','상세',r.id)+(permit(this.ctx,'orders','update')?btn('editOrder','수정',r.id)+(!civil&&!routedIds.has(r.id)&&r.state==='OPEN'?btn('markCivilOrder','민수로 지정',r.id):''):'')+(routing?btn('newRouting',civil?'민수 LOT 작성':'방산 Routing 작성',r.id):'')];}))}<div id="v4pager" class="pagination"></div></div>`);
   this.pageFooter(rows);
  }
- async orderDetail(id){
-  await super.orderDetail(id);const r=await this.s.one(id),panel=$('.detail-grid');
-  if(panel&&await this.civilOrder(r))panel.insertAdjacentHTML('afterbegin',`<div><small>생산 구분</small><strong>민수</strong></div><div><small>Shop Order No</small><strong>${esc(r.data.shop_order_no||'미등록')}</strong></div><div><small>Heat Code</small><strong>${esc(r.data.heat_code||'미등록')}</strong></div>`);
+ orderDetailFields(r,routes,view){
+  const civil=isCivilOrder(r)||routes.some(isCivilRoute);
+  return (civil?`<div><small>생산 구분</small><strong>민수</strong></div><div><small>Shop Order No</small><strong>${esc(r.data.shop_order_no||'미등록')}</strong></div><div><small>Heat Code</small><strong>${esc(r.data.heat_code||'미등록')}</strong></div>`:'')+super.orderDetailFields(r,routes,view);
  }
  async orderForm(r=null,forceCivil=false){
   if(!forceCivil&&(!r||!await this.civilOrder(r)))return super.orderForm(r);

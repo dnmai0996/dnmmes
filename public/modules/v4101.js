@@ -1,7 +1,8 @@
 import {V410Controller} from './v410.js';
 import {isCivilOrder,isCivilRoute} from './civil-domain.js';
 import {routingSort} from './routing-domain.js';
-import {permit,actionAllowed} from './permissions.js';
+import {sourceRows,compareSourceRows} from './source-review.js';
+import {permit,actionAllowed,validateBundle} from './permissions.js';
 import {$,esc,num,clock,btn,input,area,select,table,notice,message,modal,pill,exportCSV} from './ui.js';
 import {counts,duration,toUTC} from './domain.js';
 
@@ -10,29 +11,72 @@ const workDate=log=>log.data.work_date||localTime(log.data.start_at).slice(0,10)
 const options=rows=>rows.map(row=>[row.id,[row.title||row.name,row.data?.department||row.code].filter(Boolean).join(' · ')]);
 
 export class V4101Controller extends V410Controller {
+ sourceImportLinks(){
+  const count=sourceRows(this.bundle).length;if(!count)return '';
+  return `<section class="notice" id="sourceImportLinks"><strong>원문 참조자료 ${num(count)}건</strong><p>이 자료는 「업로드 자료 · 과거 Routing」에서 조회합니다. 수주·작업지시·작업실적은 자동 생성하지 않습니다. 같은 LOT가 이미 있으면 기존 원문을 보존합니다.</p>${btn('showImportedSources','등록 자료 확인','','primary')}</section>`;
+ }
  async archives(){
-  let rows=this.filter(await this.rec('source_routing'));
-  if(this.sourceView==='bush')rows=rows.filter(r=>r.data.source_family==='DNM_BUSH_XLSM');
-  this.set(`<div class="card">${this.top(this.ctx.profile.role==='admin'?btn('openSourceImport','엑셀 변환자료 일괄등록','','primary'):'')}
-   ${select('sourceView','조회자료',[['all','전체 원문'],['bush','민수 부싱 · 재공 확인대기']],this.sourceView||'all','id="sourceView"')}
-   ${notice('민수 부싱 확인대기는 2026년 투입·납품완료일 미기재 자료입니다. 실제 작업 중임을 확정한 목록은 아닙니다. LOT 수량·S/O·Heat Code·공정실적이 원본에 없어 수주·실적을 임의 생성하지 않습니다. 기존 원문과 운영자료를 보존합니다.')}
-   ${table(['원본 LOT','품번 / 품명','형식','S/O','Heat Code','LOT 수량','투입일','상태','확인'],this.pagedCells(rows,r=>[
-    esc(r.title),esc(r.data.part_no||r.data.part_revision)+'<br>'+esc(r.data.part_name),esc(r.data.part_type||''),esc(r.data.shop_order_no||r.data.so_raw||'미기재'),esc(r.data.heat_code||'미기재'),r.data.qty==null?'미기재':num(r.data.qty),esc(r.data.input_date),r.data.source_family==='DNM_BUSH_XLSM'?'재공 확인대기':'원문 참조',btn('masterDetail','원문 상세',r.id)
-   ]))}<div id="v4pager" class="pagination"></div></div>`);
-  this.pageFooter(rows);$('#sourceView').onchange=event=>{this.sourceView=event.target.value;this.pageNo=1;this.archives().catch(e=>message(e.message));};
+  const ticket=this.archiveTicket=(this.archiveTicket||0)+1,content=$('#content');
+  const stored=await this.rec('source_routing');
+  if(this.page!=='archives'||ticket!==this.archiveTicket||content!==$('#content'))return;
+  const bundle=this.sourceBundle||this.bundle,hasBundle=sourceRows(bundle).length>0;
+  const comparison=hasBundle?compareSourceRows(bundle,stored):null;this.sourceComparison=comparison;
+  if(this.sourceView==='bundle'&&!hasBundle)this.sourceView='all';
+  const view=this.sourceView||'all';
+  const reviewByCode=new Map(comparison?.rows.map(row=>[row.source.code,row])||[]);
+  let rows=view==='bundle'?sourceRows(bundle):view==='bush'?stored.filter(r=>r.data.source_family==='DNM_BUSH_XLSM'):stored;
+  rows=this.filter(rows);
+  const options=[['all','DB 원문 전체'],['bush','새로 등록된 민수 부싱'],...(hasBundle?[['bundle','선택 파일 · DB 등록 대조']]:[])];
+  const summary=comparison?`<div class="kpis" id="sourceMatchSummary"><article>파일 원문<strong>${num(comparison.total)}</strong></article><article>DB에 원문 있음<strong>${num(comparison.matched)}</strong><small>기존 동일 LOT 보존 ${num(comparison.existing)}건 포함</small></article><article>DB 원문 미확인<strong>${num(comparison.missing)}</strong></article><article>동일 LOT 원문 여러 건<strong>${num(comparison.multiple)}</strong></article></div>
+   ${notice('선택 파일: '+(this.sourceBundleName||bundle.bundle_id)+'\n「DB에 원문 있음」은 코드 또는 LOT가 일치한다는 뜻입니다. 기존 원문의 내용이 업로드 파일로 변경되었다는 뜻은 아닙니다. 원문을 비교하여 확인하세요.')}`:'';
+  this.set(`<div class="card">${this.top(this.ctx.profile.role==='admin'?btn('openSourceImport','자료 일괄등록'):'')}
+   ${notice('업로드한 원문 자료의 조회 화면입니다. 기존 동일 LOT가 보존되어 필터에서 보이지 않는 경우, 아래에서 업로드했던 JSON 파일을 선택하면 DB 등록 여부를 대조합니다. 파일 선택은 조회만 하며 DB에 저장하지 않습니다.')}
+   ${input('sourceCheckFile','업로드한 JSON 파일로 등록 여부 확인','','file','id="sourceCheckFile" accept=".json,.dnm.json"')}
+   ${summary}${select('sourceView','조회자료',options,view,'id="sourceView"')}
+   ${view==='bush'?notice('이 필터는 새 민수 부싱 형식으로 저장된 원문만 표시합니다. 이전 형식의 동일 LOT는 「DB 원문 전체」 또는 파일 대조로 확인하세요.'):''}
+   ${view==='bundle'?notice('아래 품번·품명·수량·날짜는 선택 파일의 원문입니다. DB 미확인 행도 함께 표시하며, 실제 저장 내용은 「DB 원문」에서 확인합니다. 민수 부싱 확인대기는 납품완료일 미기재 후보이며 현재 작업 중으로 확정된 자료가 아닙니다.'):''}
+   ${table(['원본 LOT','품번 / 품명','형식','S/O','Heat Code','LOT 수량','투입일','등록 확인','원문 보기'],this.pagedCells(rows,r=>{
+    const match=view==='bundle'?reviewByCode.get(r.code):null;
+    return [esc(r.data.lot||r.title),esc(r.data.part_no||r.data.part_revision)+'<br>'+esc(r.data.part_name),esc(r.data.part_type||r.data.work_type||''),esc(r.data.shop_order_no||r.data.so_raw||'미기재'),esc(r.data.heat_code||'미기재'),r.data.qty==null?'미기재':esc(r.data.qty),esc(r.data.input_date),
+     match?match.status==='missing'?'<strong>DB 원문 미확인</strong>':match.status==='existing-lot'?'기존 동일 LOT 보존':'같은 코드 원문 있음':r.data.source_family==='DNM_BUSH_XLSM'?'재공 확인대기 · DB 원문':'DB 원문',
+     match?btn('sourceCompare','파일·DB 비교',r.code)+match.matches.map(row=>btn('masterDetail','DB 원문',row.id)).join(''):btn('masterDetail','DB 원문',r.id)];
+   }))}<div id="v4pager" class="pagination"></div></div>`);
+  this.pageFooter(rows);
+  $('#sourceView').onchange=event=>{this.sourceView=event.target.value;this.pageNo=1;this.archives().catch(e=>message(e.message));};
+  const fileInput=$('#sourceCheckFile');fileInput.onchange=async event=>{
+   try{
+    const file=event.target.files[0];if(!file)return;if(file.size>35*1024*1024)throw Error('파일은 35MB 이내입니다.');
+    const book=JSON.parse(await file.text());validateBundle(book);
+    if(!sourceRows(book).length)throw Error('원본 Routing 자료가 포함된 .dnm.json 파일을 선택하세요.');
+    if(!fileInput.isConnected||this.page!=='archives')return;
+    this.sourceBundle=book;this.sourceBundleName=file.name;this.sourceView='bundle';this.pageNo=1;this.search='';await this.archives();
+   }catch(error){message(error.message);}
+  };
+ }
+ showSourceComparison(code){
+  const row=this.sourceComparison?.rows.find(item=>item.source.code===code);if(!row)throw Error('파일을 다시 선택하여 대조하세요.');
+  const fields=[['관리코드',r=>r.code],['LOT',r=>r.data.lot||r.title],['품번',r=>r.data.part_no||r.data.part_revision],['품명',r=>r.data.part_name],['형식',r=>r.data.part_type||r.data.work_type],['S/O',r=>r.data.shop_order_no||r.data.so_raw],['Heat Code',r=>r.data.heat_code],['LOT 수량',r=>r.data.qty],['투입일',r=>r.data.input_date],['납품일',r=>r.data.delivery_date],['비고',r=>r.data.note]];
+  const value=v=>v===null||v===undefined||v===''?'미기재':esc(v);
+  modal('업로드 파일 · DB 원문 비교',notice('선택 파일은 검토용입니다. 아래 DB 원문은 변경하지 않습니다. DB 미확인은 이 계정으로 조회한 원문에서 일치하는 코드·LOT를 찾지 못했다는 뜻입니다.')+
+   table(['항목','선택 파일',...(row.matches.length?row.matches.map((_,i)=>'DB 원문 '+(i+1)):['DB 원문'])],fields.map(([label,get])=>[label,value(get(row.source)),...(row.matches.length?row.matches.map(item=>value(get(item))):['미확인'])])));
+ }
+ help(){
+  if(this.page==='archives')return modal('업로드 자료 확인 · 사용방법',notice('1. 업로드했던 .dnm.json 파일을 선택합니다. DB에 다시 저장하지 않고 조회만 합니다.\n2. 파일 원문 / DB에 원문 있음 / DB 원문 미확인 건수를 확인합니다.\n3. 기존 동일 LOT 보존도 조회되며 파일·DB 비교에서 내용을 대조합니다.\n4. 등록이 필요하면 관리자만 「자료 일괄등록」에서 파일 선택·검토 후 등록합니다. 수주·실적은 원문에서 자동 생성하지 않습니다.'));
+  return super.help();
  }
  async saveRpc(name,args){
   if(name==='dnm_v410_save_order')name='dnm_v4101_save_order';
   return super.saveRpc(name,args);
  }
  async orders(){
+  const ticket=++this.orderViewTicket,content=$('#content');this.detail=null;
   const [orders,routes]=await Promise.all([this.rec('order'),this.rec('routing')]);
-  if(this.page!=='orders')return;
+  if(this.page!=='orders'||this.detail||ticket!==this.orderViewTicket||content!==$('#content'))return;
   const civilIds=new Set(routes.filter(isCivilRoute).map(r=>r.parent_id));
   const civil=order=>isCivilOrder(order)||civilIds.has(order.id);
   const routedIds=new Set(routes.map(r=>r.parent_id));
   const balances=new Map((await this.rpc('dnm_v4101_balances',{ids:orders.filter(civil).map(r=>r.id)})).rows.map(r=>[r.id,r]));
-  if(this.page!=='orders')return;
+  if(this.page!=='orders'||this.detail||ticket!==this.orderViewTicket||content!==$('#content'))return;
   const rows=this.filter(orders).filter(r=>this.orderView==='deleted'?r.data.deleted===true:r.data.deleted!==true).sort(routingSort);
   const create=permit(this.ctx,'orders','create'),update=permit(this.ctx,'orders','update'),routing=permit(this.ctx,'routing','create');
   this.set(`<div class="card">${this.top(create?btn('newCivilOrder','민수 수주 수기등록','','primary')+btn('newOrder','방산 수주 직접등록')+btn('importOrders','방산 수주 Excel 등록'):'')}
@@ -47,16 +91,15 @@ export class V4101Controller extends V410Controller {
    }))}<div id="v4pager" class="pagination"></div></div>`);
   this.pageFooter(rows);$('#orderView').onchange=event=>{this.orderView=event.target.value;this.pageNo=1;this.orders().catch(e=>message(e.message));};
  }
- async orderDetail(id){
-  await super.orderDetail(id);
-  const order=await this.s.one(id);if(!await this.civilOrder(order))return;
-  const {rows:[balance]}=await this.rpc('dnm_v4101_balances',{ids:[id]});
-  const grid=$('.detail-grid');if(grid&&balance)grid.insertAdjacentHTML('beforeend',
-   `<div><small>LOT 배정합계</small><strong>${num(balance.allocated)}</strong></div><div><small>미배정 잔량</small><strong>${num(balance.remaining)}</strong></div>`);
-  const actions=$('.actions');if(!actions)return;
-  if(permit(this.ctx,'orders','update')&&!order.data.deleted)actions.insertAdjacentHTML('afterbegin',btn('editOrder','민수 수주 수정',id)+btn('deleteCivilOrder','민수 수주 삭제',id));
-  const add=actions.querySelector('[data-vaction="newRouting"]');
-  if(add){if(order.data.deleted||order.state!=='OPEN'||Number(balance?.remaining)<=0)add.remove();else add.textContent='잔량 LOT 추가 작성';}
+ async orderDetailData(order,routes){
+  if(!isCivilOrder(order)&&!routes.some(isCivilRoute))return {};
+  const {rows:[balance]}=await this.rpc('dnm_v4101_balances',{ids:[order.id]});
+  return {balance,routingAllowed:!order.data.deleted&&order.state==='OPEN'&&Number(balance?.remaining)>0,routingLabel:'잔량 LOT 추가 작성',
+   actions:permit(this.ctx,'orders','update')&&!order.data.deleted?btn('editOrder','민수 수주 수정',order.id)+btn('deleteCivilOrder','민수 수주 삭제',order.id):''};
+ }
+ orderDetailFields(order,routes,view){
+  return super.orderDetailFields(order,routes,view)+(view.balance?
+   `<div><small>LOT 배정합계</small><strong>${num(view.balance.allocated)}</strong></div><div><small>미배정 잔량</small><strong>${num(view.balance.remaining)}</strong></div>`:'');
  }
  async orderForm(order=null,forceCivil=false){
   await super.orderForm(order,forceCivil);
@@ -138,6 +181,8 @@ export class V4101Controller extends V410Controller {
  }
  async action(action,id){
   if(!actionAllowed(this.ctx,action,id,this.page,this.cache.get(id)))throw Error('이 업무의 등록·수정 권한이 없습니다.');
+  if(action==='showImportedSources'){this.sourceBundle=this.bundle;this.sourceBundleName='';this.sourceView='bundle';return this.go('archives');}
+  if(action==='sourceCompare')return this.showSourceComparison(id);
   if(action==='openSourceImport'){if(this.ctx.profile.role!=='admin')throw Error('관리자만 자료를 등록할 수 있습니다.');return this.go('seedData');}
   if(action==='deleteCivilOrder')return this.deleteCivil('order',id);
   if(action==='civil:deleteZero')return this.deleteCivil('lot',id);

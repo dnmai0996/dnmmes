@@ -35,6 +35,7 @@ const CREATE={newCivilOrder:'orders',fieldStart:'worklogs',fieldManual:'worklogs
 const UPDATE={deleteCivilOrder:'orders',editWorklog:'worklogs',markCivilOrder:'orders',cancelPO:'receipts',revisePO:'receipts',sequenceSetting:'routing',voidDaily:'routing',editOrder:'orders',urgent:'orders',closeOrder:'orders',release:'routing',assign:'routing',managerStep:'routing',finish:'worklogs',stopLog:'worklogs',completeLog:'worklogs',confirmLog:'worklogs',cancelLog:'worklogs',ack:'worklogs',purchaseOrder:'receipts',purchaseQuote:'receipts',editPayment:'settlement',paid:'settlement',editProduct:'products',editPartner:'partners',editTemplate:'templates',editExtra:'kind',editMaster:'kind'};
 export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employee:'employees',assignment:'assignments',route_template:'templates',route_candidate:'templates',catalog:'catalog',material_master:'materials',process_master:'processes',quality_doc:'documents',products:'products'};
 export function actionRule(action,id,page,record){
+ if(['showImportedSources','sourceCompare'].includes(action))return {module:'archives',action:'read'};
  if(action.startsWith('civil:')){const name=action.slice(6);return {module:'routing',action:name==='new'?'create':['quantity','cancel','terminate','deleteZero'].includes(name)?'update':'read'};}
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
  if(['templateForOrder','templateForProduct','useCandidate'].includes(action))return {module:'templates',action:'write'};
