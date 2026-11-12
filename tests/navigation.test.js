@@ -36,7 +36,7 @@ test('display release agrees with the package while retaining the database conte
  assert.match(app,/context.version==='4.2.0'/);
  const core=readFileSync(new URL('../public/core.js',import.meta.url),'utf8');
  const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
- assert.equal(pkg.version,'4.10.2');
+ assert.equal(pkg.version,'4.10.3');
  assert.ok(core.includes("VERSION='"+pkg.version+"'"));
  const index=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
  assert.ok(index.includes('DNM 클라우드 MES v'+pkg.version));

@@ -3,7 +3,7 @@ import {duration} from './domain.js';
 import {permit} from './permissions.js';
 import {blankStep, routeProgress} from './routing-domain.js';
 import {mountSteps} from './step-editor.js';
-import {civilOperationRows, civilProcessSummary, civilResultRows, civilRows, civilState, isCivilOrder, isCivilRoute, positiveInteger, splitCivilLots, validateCivilLots} from './civil-domain.js';
+import {civilOperationRows, civilProcessSummary, civilResultRows, civilRows, civilState, civilOrderChoices, isDeletedOrder, isCivilOrder, isCivilRoute, positiveInteger, splitCivilLots, validateCivilLots} from './civil-domain.js';
 import {printCivilRouting} from './civil-print.js';
 
 const today = () => new Date(Date.now() + 32400000).toISOString().slice(0, 10);
@@ -67,7 +67,8 @@ export class CivilUI {
     const ticket = ++this.ticket;
     const [routes, orders] = await Promise.all([this.main.rec('routing'), this.main.rec('order')]);
     if (ticket !== this.ticket || this.main.page !== 'civilRouting') return;
-    const civilOrders = orders.filter(order => isCivilOrder(order) || routes.some(route => isCivilRoute(route) && route.parent_id === order.id));
+    const civilOrders = civilOrderChoices(orders,routes);
+    if(this.orderId&&!civilOrders.some(order=>order.id===this.orderId))this.orderId='';
     const rows = civilRows(routes, orders, {query: this.main.search, state: this.state, orderId: this.orderId});
     const create = this.can('create') ? civilButton('new', '민수 LOT 분할 작성', '', 'primary') : '';
     this.main.set(`<div class="card civil-page">${this.main.top(create)}
@@ -87,7 +88,7 @@ export class CivilUI {
   async routingForm(order = null) {
     this.require('create');
     if (!order) {
-      const orders = (await this.main.rec('order')).filter(row => row.state === 'OPEN' && isCivilOrder(row));
+      const orders = civilOrderChoices(await this.main.rec('order'),[],{openOnly:true});
       if (!orders.length) return modal('민수 LOT 작성', notice('고객수주에서 생산 구분을 민수로 선택하고 수주를 먼저 등록하세요.'));
       return modal('LOT를 작성할 민수 수주 선택', select('order_id', '수주 / Shop Order', [['', '수주 선택'], ...orders.map(row => [row.id, orderLabel(row)])], '', 'required'), async form => {
         const selected = orders.find(row => row.id === form.order_id);
@@ -95,6 +96,8 @@ export class CivilUI {
         setTimeout(() => this.routingForm(selected).catch(error => message(error.message)), 0);
       }, '분할 계획 작성');
     }
+    order=await this.main.s.one(order.id);
+    if(isDeletedOrder(order)||order.state!=='OPEN')throw Error('삭제·마감된 수주에는 새 LOT를 작성할 수 없습니다. 현재 수주를 다시 선택하세요.');
     const [plan, refs, templates] = await Promise.all([
       this.main.rpc('dnm_v410_plan_info', {p_order: order.id}), this.main.refData(), this.main.rec('route_template')
     ]);
@@ -173,8 +176,10 @@ export class CivilUI {
     const editable = canManage && ['DRAFT', 'RELEASED'].includes(route.state);
     const running = route.state === 'RELEASED';
     const body = `<div class="detail-grid">${[['LOT', route.data.lot || route.code], ['Shop Order', route.data.shop_order_no || route.data.shop_order || route.data.production_no], ['Heat Code', route.data.heat_code], ['품번', route.data.part_no], ['LOT 수량', num(route.data.qty)], ['상태', civilState(route)], ['완료 공정', progress.done + ' / ' + progress.ops.length], ['작업 예정일', route.data.plan_date]].map(([label, value]) => `<div><small>${esc(label)}</small><strong>${esc(value || '—')}</strong></div>`).join('')}</div>
+      ${route.data.document_refs_pending?notice('문서항목 확인대기: S/O·Heat Code를 확인하여 고객 제출 전에 보완하세요.','warning'):''}
       ${route.data.termination_reason ? notice('불량 종결 사유 · ' + route.data.termination_reason, 'warning') : ''}
       <div class="actions">${civilButton('print', '민수 Routing PDF·인쇄', id, 'primary')}${civilButton('results', '이 LOT 실적', id)}
+      ${this.main.ctx.profile.role==='admin'&&route.data.source_routing_id&&!['CANCELLED','SUPERSEDED'].includes(route.state)?btn('transfer:refs','S/O·Heat 보완',id):''}
       ${editable ? civilButton('quantity', 'LOT 수량 수정', id) : ''}
       ${canManage && !['CANCELLED','SUPERSEDED'].includes(route.state) ? civilButton('deleteZero', '실적 0 LOT 삭제', id) : ''}
       ${canManage && ['RELEASED', 'DONE'].includes(route.state) ? civilButton('terminate', '불량 최종종결', id) : ''}${editable && route.state === 'DRAFT' ? btn('release', '작업지시 배포', id) : ''}</div>

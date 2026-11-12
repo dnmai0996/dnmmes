@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "missing S/O and Heat are filled and pending marker clears",
+    "empty parent S/O is filled without quantity change",
+    "reference correction preserves original and updates reviewed metadata only",
+    "document correction never alters process or production quantities",
+    "same correction request does not duplicate history",
+    "stale correction cannot overwrite later change",
+    "S/O mismatch against parent order is rejected",
+    "non-admin reference corrections are rejected"
+  ]
+}

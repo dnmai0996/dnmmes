@@ -2,7 +2,7 @@ import {esc} from '../core.js';
 import {GROUPS,TOP_PAGES,navGroups} from './permissions.js';
 export const NAV_LABELS={
  dashboard:'작업진척 대시보드',orders:'고객 수주',sourceOrders:'수주 원본 82열',
- templates:'제품 Routing 템플릿',routeCandidates:'Routing 원문 후보',routingSetup:'수주 → Routing 초안',routing:'방산 Routing Sheet 관리',civilRouting:'민수 LOT · Routing',civilResults:'민수 실적조회',
+ templates:'제품 Routing 템플릿',routeCandidates:'Routing 원문 후보',routingSetup:'수주 → Routing 초안',routing:'방산 Routing Sheet 관리',civilRouting:'민수 LOT · Routing',civilResults:'민수 실적조회',civilTransfer:'민수 자료 전환',
  instructions:'작업지시 · 배포현황',workCards:'작업일보 사전양식',touchWork:'터치 작업입력',voiceWork:'음성 작업입력',worklogs:'작업일보',
  purchase:'구매요청 · 결재',receipts:'발주 · 입고 · 반품',settlement:'정산',quality:'품질 · 출하',documents:'품질문서 대장',
  equipmentRegister:'설비 등록',equipment:'설비관리',instruments:'계측기관리',products:'제품',materials:'자재',employees:'작업자',processes:'공정',customers:'매출처',suppliers:'매입처',assignments:'설비·작업자 연결',catalog:'공구·공급업체',

@@ -51,7 +51,7 @@ test('done routing operation remains visible for worker history',()=>{
 });
 test('user-facing menu moves master templates away from customer order',()=>{
  const nav=Object.fromEntries(GROUPS);
- assert.deepEqual(nav['수주관리'],['orders','routing','civilRouting','civilResults']);
+ assert.deepEqual(nav['수주관리'],['orders','routing','civilRouting','civilResults','civilTransfer']);
  assert.ok(nav['기준정보'].includes('templates'));
  assert.ok(!nav['초기구축·운영'].includes('routingSetup'));
 });

@@ -22,14 +22,14 @@ export function closeModal(){const d=$('#v4dialog');if(d?.dataset.busy==='true')
 export function onModalClose(f){cleanup=f;}
 export function modal(title,body,onSubmit=null,label='저장'){
  let d=$('#v4dialog');if(!d){d=document.createElement('dialog');d.id='v4dialog';document.body.append(d);}if(!d.dataset.sortAttached){d.addEventListener('click',e=>{const b=e.target.closest('[data-table-sort]');if(b&&d.contains(b)){e.preventDefault();localHeaderSort(b);}});d.dataset.sortAttached='true';}if(d.open)closeModal();d.dataset.busy='false';
- d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.10.2</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
+ d.innerHTML=`<form id="v4form"><header><div><small>DNM 업무관리 4.10.3</small><h2>${esc(title)}</h2></div><button type="button" id="v4dismiss" class="quiet" aria-label="닫기">✕</button></header><section class="modalbody">${body}</section><div id="v4message" class="message" hidden role="alert"></div><footer><button type="button" id="v4cancel" class="secondary">닫기</button>${onSubmit?`<button id="v4submit">${esc(label)}</button>`:''}</footer></form>`;
  $('#v4cancel').onclick=$('#v4dismiss').onclick=closeModal;d.oncancel=e=>{if(d.dataset.busy==='true'){e.preventDefault();return;}cleanup();cleanup=()=>{};};d.showModal();
- let key=crypto.randomUUID(),frozen=null;
+ let key=crypto.randomUUID(),frozen=null,disabledBeforeFreeze=null;
  $('#v4form').addEventListener('invalid',()=>message('필수 항목과 입력 형식을 확인하세요.'),true);
  $('#v4form').onsubmit=async e=>{e.preventDefault();if(!onSubmit||d.dataset.busy==='true')return;const f=frozen||Object.fromEntries(new FormData(e.target));busy(true);message('처리 중입니다. 중복 클릭하지 마세요.','info');
   try{await onSubmit(f,key);frozen=null;busy(false);closeModal();}
-  catch(err){if(err.unknown){frozen=f;all('.modalbody input,.modalbody select,.modalbody textarea',d).forEach(x=>x.disabled=true);$('#v4submit').textContent='같은 요청 다시 확인';message(err.message+'\n입력값을 유지했습니다. 같은 요청번호로 재확인하거나 닫고 목록을 확인하세요.');}
-   else{key=crypto.randomUUID();frozen=null;all('.modalbody input,.modalbody select,.modalbody textarea',d).forEach(x=>x.disabled=false);$('#v4submit').textContent=label;message(err.message);}}
+  catch(err){if(err.unknown){frozen=f;const fields=all('.modalbody input,.modalbody select,.modalbody textarea',d);if(!disabledBeforeFreeze)disabledBeforeFreeze=new Map(fields.map(x=>[x,x.disabled]));fields.forEach(x=>x.disabled=true);$('#v4submit').textContent='같은 요청 다시 확인';message(err.message+'\n입력값을 유지했습니다. 같은 요청번호로 재확인하거나 닫고 목록을 확인하세요.');}
+   else{key=crypto.randomUUID();frozen=null;if(disabledBeforeFreeze){for(const [field,disabled] of disabledBeforeFreeze)field.disabled=disabled;disabledBeforeFreeze=null;}$('#v4submit').textContent=label;message(err.message);}}
   finally{busy(false);}
  };
  return d;

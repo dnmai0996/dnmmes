@@ -3,7 +3,7 @@ export const MODULES={dashboard:'작업진척 대시보드',orders:'고객수주
 // Dashboard is a standalone entry; group visibility still uses the existing database ACL.
 export const TOP_PAGES=['dashboard'];
 export const GROUPS=[
- ['수주관리',['orders','routing','civilRouting','civilResults']],
+ ['수주관리',['orders','routing','civilRouting','civilResults','civilTransfer']],
  ['생산관리',['instructions','workCards','touchWork','voiceWork','worklogs']],
  ['구매관리',['purchase','receipts','settlement']],
  ['품질관리',['quality','documents']],
@@ -12,7 +12,7 @@ export const GROUPS=[
  ['초기구축·운영',['seedData','workforceSetup','sourceReview','sourceOrders','routeCandidates','archives','notes','profiles','access','audit','backup','home']]
 ];
 export const PAGE_MODULE={civilRouting:'routing',civilResults:'routing',equipmentRegister:'equipment',instructions:'routing',sourceOrders:'orders',touchWork:'worklogs',voiceWork:'worklogs',work:'worklogs',routeCandidates:'templates',routingSetup:'routing',workCards:'routing',sourceReview:'products'};
-export const ADMIN_PAGES=new Set(['seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
+export const ADMIN_PAGES=new Set(['civilTransfer','seedData','workforceSetup','profiles','access','audit','backup','home','sourceReview']);
 export function permit(ctx,module,action='read'){
  if(!ctx?.profile?.active)return false;if(ctx.profile.role==='admin')return true;
  if(action!=='read'&&ctx.profile.role!=='member')return false;
@@ -36,6 +36,7 @@ const UPDATE={deleteCivilOrder:'orders',editWorklog:'worklogs',markCivilOrder:'o
 export const KIND_MODULE={equipment:'equipment',instrument:'instruments',employee:'employees',assignment:'assignments',route_template:'templates',route_candidate:'templates',catalog:'catalog',material_master:'materials',process_master:'processes',quality_doc:'documents',products:'products'};
 export function actionRule(action,id,page,record){
  if(['showImportedSources','sourceCompare'].includes(action))return {module:'archives',action:'read'};
+ if(action==='openSourceTransfer'||action.startsWith('transfer:'))return {module:'archives',action:'read',admin:true};
  if(action.startsWith('civil:')){const name=action.slice(6);return {module:'routing',action:name==='new'?'create':['quantity','cancel','terminate','deleteZero'].includes(name)?'update':'read'};}
  if(['approve','reject','delegate'].includes(action))return {module:'purchase',action:'read',approve:true};
  if(['templateForOrder','templateForProduct','useCandidate'].includes(action))return {module:'templates',action:'write'};
@@ -50,7 +51,7 @@ export function actionRule(action,id,page,record){
  if(m==='partners')m=record?.category==='supplier'?'suppliers':record?.category==='customer'?'customers':page==='suppliers'?'suppliers':'customers';
  return {module:m,action:CREATE[action]?'create':'update'};
 }
-export function actionAllowed(ctx,action,id,page,record){const rule=actionRule(action,id,page,record);if(!rule)return true;return (rule.action==='write'?(permit(ctx,rule.module,'create')||permit(ctx,rule.module,'update')):permit(ctx,rule.module,rule.action))&&(!rule.approve||ctx.profile.role==='admin'||ctx.capabilities?.includes('approve'));}
+export function actionAllowed(ctx,action,id,page,record){const rule=actionRule(action,id,page,record);if(!rule)return true;return (rule.action==='write'?(permit(ctx,rule.module,'create')||permit(ctx,rule.module,'update')):permit(ctx,rule.module,rule.action))&&(!rule.admin||ctx.profile.role==='admin')&&(!rule.approve||ctx.profile.role==='admin'||ctx.capabilities?.includes('approve'));}
 export function validateBundle(book){
  if(book?.format!=='dnm-seed-bundle-v42'||!Array.isArray(book.rows)||book.rows.length>15000)throw Error('v4.2 기준정보 자료묶음 파일을 선택하세요.');
  const kinds=new Set(['products','partners','employee','equipment','instrument','catalog','material_master','process_master','part_detail','route_template','route_candidate','flow_reference','source_routing','data_issue']);const seen=new Set();

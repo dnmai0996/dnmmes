@@ -11,6 +11,16 @@ export function isCivilRoute(route) {
   return route?.kind === 'routing' && (route.data?.daily === true || isCivilOrder(route));
 }
 
+export function isDeletedOrder(order) {
+  return order?.data?.deleted === true || order?.state === 'CANCELLED';
+}
+
+export function civilOrderChoices(orders, routes = [], {openOnly = false} = {}) {
+  const linked = new Set(routes.filter(isCivilRoute).map(route => route.parent_id));
+  return orders.filter(order => !isDeletedOrder(order) && (!openOnly || order.state === 'OPEN') &&
+    (isCivilOrder(order) || linked.has(order.id))).sort((a,b) => collator.compare(a.data?.shop_order_no || a.code, b.data?.shop_order_no || b.code));
+}
+
 export function civilState(route) {
   if (route.state === 'CANCELLED') return '취소';
   if (route.data?.terminated || route.state === 'TERMINATED') return '불량 종결';

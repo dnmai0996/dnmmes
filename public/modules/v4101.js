@@ -1,3 +1,4 @@
+import {SourceTransferUI} from './source-transfer.js';
 import {V410Controller} from './v410.js';
 import {isCivilOrder,isCivilRoute} from './civil-domain.js';
 import {routingSort} from './routing-domain.js';
@@ -11,9 +12,16 @@ const workDate=log=>log.data.work_date||localTime(log.data.start_at).slice(0,10)
 const options=rows=>rows.map(row=>[row.id,[row.title||row.name,row.data?.department||row.code].filter(Boolean).join(' · ')]);
 
 export class V4101Controller extends V410Controller {
+ constructor(...args){super(...args);this.transfer=new SourceTransferUI(this);}
+ async load(page){
+  if(page!=='civilTransfer')return super.load(page);
+  this.transfer.require();if(this.loadingImport||this.loadingBackup)throw Error('처리가 끝난 뒤 이동하세요.');
+  if(this.page!==page){this.search='';this.pageNo=1;this.detail=null;}this.page=page;return this.transfer.load();
+ }
+
  sourceImportLinks(){
   const count=sourceRows(this.bundle).length;if(!count)return '';
-  return `<section class="notice" id="sourceImportLinks"><strong>원문 참조자료 ${num(count)}건</strong><p>이 자료는 「업로드 자료 · 과거 Routing」에서 조회합니다. 수주·작업지시·작업실적은 자동 생성하지 않습니다. 같은 LOT가 이미 있으면 기존 원문을 보존합니다.</p>${btn('showImportedSources','등록 자료 확인','','primary')}</section>`;
+  return `<section class="notice" id="sourceImportLinks"><strong>원문 참조자료 ${num(count)}건</strong><p>이 자료는 「업로드 자료 · 과거 Routing」에서 조회합니다. 수주·작업지시·작업실적은 자동 생성하지 않습니다. 같은 LOT가 이미 있으면 기존 원문을 보존합니다.</p>${btn('showImportedSources','등록 자료 확인','','primary')}${btn('openSourceTransfer','수주·작업지시로 전환')}</section>`;
  }
  async archives(){
   const ticket=this.archiveTicket=(this.archiveTicket||0)+1,content=$('#content');
@@ -29,7 +37,7 @@ export class V4101Controller extends V410Controller {
   const options=[['all','DB 원문 전체'],['bush','새로 등록된 민수 부싱'],...(hasBundle?[['bundle','선택 파일 · DB 등록 대조']]:[])];
   const summary=comparison?`<div class="kpis" id="sourceMatchSummary"><article>파일 원문<strong>${num(comparison.total)}</strong></article><article>DB에 원문 있음<strong>${num(comparison.matched)}</strong><small>기존 동일 LOT 보존 ${num(comparison.existing)}건 포함</small></article><article>DB 원문 미확인<strong>${num(comparison.missing)}</strong></article><article>동일 LOT 원문 여러 건<strong>${num(comparison.multiple)}</strong></article></div>
    ${notice('선택 파일: '+(this.sourceBundleName||bundle.bundle_id)+'\n「DB에 원문 있음」은 코드 또는 LOT가 일치한다는 뜻입니다. 기존 원문의 내용이 업로드 파일로 변경되었다는 뜻은 아닙니다. 원문을 비교하여 확인하세요.')}`:'';
-  this.set(`<div class="card">${this.top(this.ctx.profile.role==='admin'?btn('openSourceImport','자료 일괄등록'):'')}
+  this.set(`<div class="card">${this.top(this.ctx.profile.role==='admin'?btn('openSourceImport','자료 일괄등록')+btn('openSourceTransfer','수주·작업지시로 전환','','primary'):'')}
    ${notice('업로드한 원문 자료의 조회 화면입니다. 기존 동일 LOT가 보존되어 필터에서 보이지 않는 경우, 아래에서 업로드했던 JSON 파일을 선택하면 DB 등록 여부를 대조합니다. 파일 선택은 조회만 하며 DB에 저장하지 않습니다.')}
    ${input('sourceCheckFile','업로드한 JSON 파일로 등록 여부 확인','','file','id="sourceCheckFile" accept=".json,.dnm.json"')}
    ${summary}${select('sourceView','조회자료',options,view,'id="sourceView"')}
@@ -61,6 +69,7 @@ export class V4101Controller extends V410Controller {
    table(['항목','선택 파일',...(row.matches.length?row.matches.map((_,i)=>'DB 원문 '+(i+1)):['DB 원문'])],fields.map(([label,get])=>[label,value(get(row.source)),...(row.matches.length?row.matches.map(item=>value(get(item))):['미확인'])])));
  }
  help(){
+  if(this.page==='civilTransfer')return this.transfer.help();
   if(this.page==='archives')return modal('업로드 자료 확인 · 사용방법',notice('1. 업로드했던 .dnm.json 파일을 선택합니다. DB에 다시 저장하지 않고 조회만 합니다.\n2. 파일 원문 / DB에 원문 있음 / DB 원문 미확인 건수를 확인합니다.\n3. 기존 동일 LOT 보존도 조회되며 파일·DB 비교에서 내용을 대조합니다.\n4. 등록이 필요하면 관리자만 「자료 일괄등록」에서 파일 선택·검토 후 등록합니다. 수주·실적은 원문에서 자동 생성하지 않습니다.'));
   return super.help();
  }
@@ -181,6 +190,8 @@ export class V4101Controller extends V410Controller {
  }
  async action(action,id){
   if(!actionAllowed(this.ctx,action,id,this.page,this.cache.get(id)))throw Error('이 업무의 등록·수정 권한이 없습니다.');
+  if(action==='openSourceTransfer'){this.transfer.require();return this.go('civilTransfer');}
+  if(action.startsWith('transfer:'))return this.transfer.action(action.slice(9),id);
   if(action==='showImportedSources'){this.sourceBundle=this.bundle;this.sourceBundleName='';this.sourceView='bundle';return this.go('archives');}
   if(action==='sourceCompare')return this.showSourceComparison(id);
   if(action==='openSourceImport'){if(this.ctx.profile.role!=='admin')throw Error('관리자만 자료를 등록할 수 있습니다.');return this.go('seedData');}

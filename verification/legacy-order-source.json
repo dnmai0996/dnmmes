@@ -1,0 +1,32 @@
+{
+  "passed": [
+    "civil order edit and delete live inside its owned detail card",
+    "40 refreshes never append buttons to global heading",
+    "40 refreshes preserve one detail grid and action pair",
+    "sidebar is unchanged by detail refreshes",
+    "civil fields and balances appear once",
+    "remaining lot action stays in content",
+    "scoped edit button invokes the order action exactly once",
+    "late civilian response cannot overwrite newer defence detail",
+    "defence detail retains routing history and creation",
+    "late detail response does not reopen an order after returning to list",
+    "late list request cannot replace newly opened detail",
+    "late detail cannot overwrite a different menu",
+    "read-only user sees no edit delete or routing creation",
+    "fully allocated order has no additional LOT action",
+    "deleted order exposes no mutation actions",
+    "file picker opens comparison view without importing",
+    "DB and missing counts reflect stored rows not file size",
+    "legacy row appears in comparison despite missing new source-family metadata",
+    "missing row is visibly marked and has no fake DB link",
+    "unavailable quantities remain blank rather than fabricated zeros",
+    "source text is escaped in comparison list",
+    "comparison shows both file and preserved DB values",
+    "source inspection performs no write requests or record changes",
+    "import page prominently links to registered source verification",
+    "import shortcut navigates to matching legacy and new source rows",
+    "after reload a file can be checked again without reimport",
+    "late source lookup cannot overwrite the current order menu",
+    "global heading and navigation remain unchanged after all transitions"
+  ]
+}

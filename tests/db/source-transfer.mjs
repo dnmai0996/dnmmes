@@ -1,0 +1,114 @@
+// Call only in an isolated synthetic database after migrations 01–29.
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+export async function sourceTransferTests(c,connect){
+ const admin='11111111-1111-4111-8111-111111111111',viewer='44444444-4444-4444-8444-444444444444';let sequence=0;const checks=[];
+ const check=(name,fn)=>{fn();checks.push(name);console.log('TRANSFER PASS '+name)};
+ const auth=id=>c.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[id]);
+ const get=async id=>(await c.query('SELECT * FROM public.dnm_v4_records WHERE id=$1',[id])).rows[0];
+ const rpc=async(name,p,key=randomUUID(),client=c)=>(await client.query('SELECT public.'+name+'($1,$2) r',[p,key])).rows[0].r;
+ const source=async(data={})=>{const lot='TEST-4103-'+(++sequence);return(await c.query("INSERT INTO public.dnm_v4_records(kind,code,title,state,data) VALUES('source_routing',$1,$2,'REFERENCE',$3) RETURNING *",['SRC-'+lot,lot,{lot,part_no:'PART-4103',part_name:'시험 부싱',part_type:'F',qty:null,source_values:['원본',null,17],...data}])).rows[0]};
+ const base=rows=>({rows:rows.map(r=>({id:r.id,version:r.version,values:{qty:10,current_state:'IN_PROGRESS'}})),part_no:'PART-4103',part_type:'F',order:{customer:'검증고객',part_no:'PART-4103',part_name:'시험 부싱',qty:100,shop_order_no:'SO-4103',heat_code:'HEAT-4103'},plan_date:'2026-11-12',manager_id:admin,steps:[{code:'010',name:'선삭',kind:'WORK',independent:true},{code:'020',name:'후가공',kind:'WORK',independent:true}],release:true,reviewed:true,skip_invalid:true,allow_missing_refs:false,reason:'현물 수량 및 진행 여부 확인'});
+ const reject=async(name,fn,pattern)=>{await assert.rejects(fn,pattern);checks.push(name);console.log('TRANSFER PASS '+name)};
+ await auth(admin);
+ const s=await source(),original=structuredClone(s.data),p=base([s]),key=randomUUID();
+ const result=await rpc('dnm_v4103_convert_sources',p,key),ord=await get(result.order_id),route=await get(result.lots[0].route_id);
+ check('source becomes one civilian order and released LOT',()=>{assert.equal(result.created,1);assert.equal(ord.data.order_type,'CIVIL');assert.equal(route.state,'RELEASED');assert.equal(result.remaining,90)});
+ check('original LOT and source lineage are preserved alongside internal serial',()=>{assert.equal(route.data.lot,s.data.lot);assert.equal(route.data.source_routing_id,s.id);assert.match(route.code,/^\d{4}-\d+$/);assert.notEqual(route.code,route.data.lot)});
+ check('Shop Order and Heat flow into the route',()=>assert.deepEqual([route.data.shop_order_no,route.data.heat_code],['SO-4103','HEAT-4103']));
+ const stored=await get(s.id),raw={...stored.data};delete raw.mes_transfer;
+ check('conversion never changes original source fields or REFERENCE state',()=>{assert.deepEqual(raw,original);assert.equal(stored.state,'REFERENCE');assert.equal(stored.data.mes_transfer.status,'CONVERTED')});
+ const ops=(await c.query("SELECT * FROM public.dnm_v4_records WHERE kind='operation' AND parent_id=$1 ORDER BY code",[route.id])).rows;
+ check('instructions are WAIT with zero actual production and no fabricated worklogs',()=>{assert.equal(ops.length,2);assert.ok(ops.every(o=>o.state==='WAIT'&&Number(o.data.confirmed_qty||0)===0))});
+ check('same request replay returns same conversion',()=>{});assert.deepEqual(await rpc('dnm_v4103_convert_sources',p,key),result);
+ const duplicate=await rpc('dnm_v4103_convert_sources',p);
+ check('different request key still cannot duplicate active source LOT',()=>{assert.equal(duplicate.created,0);assert.equal(duplicate.issues[0].code,'ALREADY_CONVERTED')});
+ await reject('same key with different values is rejected',()=>rpc('dnm_v4103_convert_sources',{...p,reason:'변경'},key),/요청번호/);
+ await reject('converted source review is protected',()=>rpc('dnm_v4103_source_review',{action:'exclude',reason:'시험',rows:[{id:s.id,version:stored.version}]}),/전환/);
+ const employee=(await c.query("SELECT * FROM public.dnm_v4_records WHERE kind='employee' AND code='EMP-TEST'")).rows[0];
+ const machine=(await c.query("SELECT * FROM public.dnm_v4_records WHERE kind='equipment' AND data->>'active'='true' LIMIT 1")).rows[0];
+ const work=(await c.query("SELECT public.dnm_v410_work('manual',$1,$2) r",[{id:ops[1].id,version:ops[1].version,employee_id:employee.id,equipment_id:machine.id,start_at:'2026-11-12T01:00:00Z',end_at:'2026-11-12T02:00:00Z',work_date:'2026-11-12',total:3,defect:1,reason:'전환 후 실제 작업 검증',memo:'전환 실적'},randomUUID()])).rows[0].r;
+ const log=await get(work.id);
+ check('transferred instruction accepts real worklog on an independent later process',()=>{assert.equal(log.state,'CONFIRMED');assert.equal(Number(log.data.total),3);assert.equal(Number(log.data.good),2);assert.equal(log.data.employee_id,employee.id);assert.equal(log.data.equipment_id,machine.id)});
+ const good=await source(),bad=await source(),partial=base([good,bad]);partial.rows[1].values.qty=null;
+ const partResult=await rpc('dnm_v4103_convert_sources',partial);
+ check('valid row converts while unknown quantity remains reviewable with reason',()=>{assert.equal(partResult.created,1);assert.equal(partResult.issues.length,1);assert.equal(partResult.issues[0].id,bad.id)});
+ const badAfter=await get(bad.id);
+ check('problem record retains original quantity and stores actionable error',()=>{assert.equal(badAfter.data.qty,null);assert.match(badAfter.data.mes_transfer.last_error,/수량/)});
+ let q=base([badAfter]);q.rows[0].values.current_state='COMPLETED';const allBad=await rpc('dnm_v4103_convert_sources',q);
+ check('all-invalid selection creates no empty order',()=>{assert.equal(allBad.created,0);assert.equal(allBad.order_id,null);assert.match(allBad.issues[0].message,/완료/)});
+ const atomicGood=await source(),atomicBad=await source();q=base([atomicGood,atomicBad]);q.skip_invalid=false;q.rows[1].values.qty=null;
+ await reject('strict mode atomically rejects a mixed valid-invalid batch',()=>rpc('dnm_v4103_convert_sources',q),/수량/);
+ check('strict rejection leaves valid and invalid originals unchanged',()=>{});assert.deepEqual((await get(atomicGood.id)).data,atomicGood.data);assert.deepEqual((await get(atomicBad.id)).data,atomicBad.data);
+ const exclusions=await source();let review={action:'exclude',reason:'현물 재공 확인 불가',rows:[{id:exclusions.id,version:exclusions.version}]};const reviewKey=randomUUID(),ex=await rpc('dnm_v4103_source_review',review,reviewKey);
+ assert.deepEqual(await rpc('dnm_v4103_source_review',review,reviewKey),ex);
+ check('exclusion is recorded and idempotent',()=>assert.equal(ex.count,1));
+ let latest=await get(exclusions.id);let excluded=await rpc('dnm_v4103_convert_sources',base([latest]));check('excluded row is not silently converted',()=>assert.equal(excluded.created,0));
+ latest=await get(exclusions.id);await rpc('dnm_v4103_source_review',{action:'reopen',reason:'현물 확인 완료',rows:[{id:latest.id,version:latest.version,values:{qty:7,current_state:'NOT_STARTED'}}]});latest=await get(exclusions.id);
+ check('reopen retains exclusion history in audit and stores separate corrected values',()=>{assert.equal(latest.data.mes_transfer.status,'PENDING');assert.equal(latest.data.qty,null);assert.equal(latest.data.mes_transfer.review.qty,7)});
+ await reject('original LOT cannot be renamed through review',()=>rpc('dnm_v4103_source_review',{action:'save',reason:'시험',rows:[{id:latest.id,version:latest.version,values:{lot:'DIFFERENT'}}]}),/LOT/);
+ await reject('stale review cannot overwrite newer corrections',()=>rpc('dnm_v4103_source_review',{action:'save',reason:'시험',rows:[{id:latest.id,version:1}]}),/변경/);
+ for(const [label,changes,pattern] of [
+  ['mixed TYPE',{part_type:'NF'},/TYPE/],['negative quantity',{qty:-1},/수량/],['invalid date',{input_date:'2026-99-01'},/date|날짜|투입일/i],['mismatching Shop Order',{shop_order_no:'WRONG-SO'},/S\/O/]
+ ]){const r=await source();const b=base([r]);Object.assign(b.rows[0].values,changes);const res=await rpc('dnm_v4103_convert_sources',b);check(label+' is held for review',()=>{assert.equal(res.created,0);assert.match(res.issues[0].message,pattern)})}
+ const missing=await source();q=base([missing]);q.order.shop_order_no='';q.order.heat_code='';let noRefs=await rpc('dnm_v4103_convert_sources',q);
+ check('missing references require explicit acknowledgement',()=>assert.equal(noRefs.created,0));
+ const missingNow=await get(missing.id);q.rows[0].version=missingNow.version;q.allow_missing_refs=true;const refsResult=await rpc('dnm_v4103_convert_sources',q);
+ check('acknowledged missing references remain visibly pending on route',()=>{});assert.equal((await get(refsResult.lots[0].route_id)).data.document_refs_pending,true);
+ const linked=await source();q=base([linked]);delete q.order;q.order_id=ord.id;q.order_version=(await get(ord.id)).version;q.rows[0].values.qty=30;
+ const linkedResult=await rpc('dnm_v4103_convert_sources',q);
+ check('existing order link consumes its remaining quantity only',()=>{assert.equal(linkedResult.order_id,ord.id);assert.equal(linkedResult.remaining,60)});
+ const tooMuch=await source();q=base([tooMuch]);q.order_id=ord.id;q.order_version=(await get(ord.id)).version;q.rows[0].values.qty=61;
+ await reject('over-allocation is rejected without creating any LOT',()=>rpc('dnm_v4103_convert_sources',q),/잔량/);
+ const beforeRollback=await get(tooMuch.id);check('over-allocation preserves source review state',()=>assert.deepEqual(beforeRollback.data,tooMuch.data));
+ const duplicateSource=await source({lot:s.data.lot});const dup=await rpc('dnm_v4103_convert_sources',base([duplicateSource]));check('different source with same live original LOT is held',()=>{assert.equal(dup.created,0);assert.match(dup.issues[0].message,/이미/)});
+ const a=await source({lot:'TEST-SAME-LOT'}),b=await source({lot:'TEST-SAME-LOT'}),same=await rpc('dnm_v4103_convert_sources',base([a,b]));check('ambiguous same-LOT sources in one batch both stay in review',()=>{assert.equal(same.created,0);assert.equal(same.issues.length,2)});
+ const cancelledSource=await source(),cancelResult=await rpc('dnm_v4103_convert_sources',base([cancelledSource]));let cancelRoute=await get(cancelResult.lots[0].route_id);
+ await c.query("SELECT public.dnm_v4101_delete('lot',$1,$2)",[{id:cancelRoute.id,version:cancelRoute.version,reason:'미착수 계획 취소'},randomUUID()]);
+ let cancelled=await get(cancelledSource.id);assert.equal((await rpc('dnm_v4103_convert_sources',base([cancelled]))).created,0);
+ cancelled=await get(cancelledSource.id);await rpc('dnm_v4103_source_review',{action:'reopen',reason:'취소 후 현물 재확인',rows:[{id:cancelled.id,version:cancelled.version}]});cancelled=await get(cancelledSource.id);
+ const reConverted=await rpc('dnm_v4103_convert_sources',base([cancelled]));
+ check('cancelled LOT requires explicit reopen and retains both conversion references',()=>{assert.equal(reConverted.created,1);assert.notEqual(reConverted.lots[0].route_id,cancelRoute.id)});assert.equal((await get(cancelled.id)).data.mes_transfer.history.length,2);
+ const emptyOrder=await rpc('dnm_v4101_save_order',{data:{order_type:'CIVIL',customer:'시험',part_no:'PART-4103',qty:10}});let deleted=await get(emptyOrder.id);
+ await c.query("SELECT public.dnm_v4101_delete('order',$1,$2)",[{id:deleted.id,version:deleted.version,reason:'수주 취소'},randomUUID()]);deleted=await get(deleted.id);
+ const delSource=await source();q=base([delSource]);q.order_id=deleted.id;q.order_version=deleted.version;
+ await reject('conversion rejects a deleted parent order',()=>rpc('dnm_v4103_convert_sources',q),/삭제/);
+ await reject('legacy routing inserts also reject deleted parents',()=>c.query("INSERT INTO public.dnm_v4_records(kind,code,title,state,parent_id,data) VALUES('routing','DELETED-GUARD','시험','DRAFT',$1,'{}')",[deleted.id]),/삭제된 수주/);
+ await c.query("INSERT INTO public.dnm_v4_records(kind,code,title,state,parent_id,data) VALUES('routing','CANCEL-HISTORY','시험','CANCELLED',$1,'{}')",[deleted.id]);
+ await reject('cancelled history cannot be reactivated beneath deleted order',()=>c.query("UPDATE public.dnm_v4_records SET state='DRAFT' WHERE code='CANCEL-HISTORY'"),/삭제된 수주/);
+ check('cancelled history remains accessible',()=>{});assert.equal((await c.query("SELECT state FROM public.dnm_v4_records WHERE code='CANCEL-HISTORY'")).rows[0].state,'CANCELLED');
+ const permissions=(await c.query("SELECT has_function_privilege('anon','public.dnm_v4103_convert_sources(jsonb,uuid)','execute') anon,has_function_privilege('authenticated','dnm_private.v4103_values(public.dnm_v4_records,jsonb)','execute') internal")).rows[0];
+ check('anonymous and direct helper access are denied',()=>assert.deepEqual(permissions,{anon:false,internal:false}));await auth(viewer);
+ await reject('non-admin conversion is rejected server-side',()=>rpc('dnm_v4103_convert_sources',base([delSource])),/관리자/);
+ await reject('non-admin source review is rejected server-side',()=>rpc('dnm_v4103_source_review',{action:'save',rows:[],reason:'시험'}),/관리자/);await auth(admin);
+ await reject('501-row conversion rejected before mutation',()=>rpc('dnm_v4103_convert_sources',base(Array.from({length:501},()=>delSource))),/500/);
+ if(connect){const concurrent=await source(),payload=base([concurrent]);const other=await connect();try{await other.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[admin]);const both=await Promise.all([rpc('dnm_v4103_convert_sources',payload),rpc('dnm_v4103_convert_sources',payload,randomUUID(),other)]);check('concurrent conversion attempts create exactly one operational LOT',()=>assert.equal(both.reduce((n,r)=>n+r.created,0),1))}finally{await other.end()}}
+ const bulk=[];for(let i=0;i<500;i++)bulk.push(await source());q=base(bulk);q.order.qty=5000;q.steps=Array.from({length:17},(_,i)=>({code:String((i+1)*10).padStart(3,'0'),name:'공정'+i,kind:'WORK',independent:true}));q.release=true;await c.query("SET statement_timeout='150s'");const started=Date.now(),bulkResult=await rpc('dnm_v4103_convert_sources',q);
+ const bulkIds=bulkResult.lots.map(r=>r.route_id);
+ const bulkStates=(await c.query("SELECT kind,state,count(*)::int n FROM public.dnm_v4_records WHERE id=ANY($1::uuid[]) OR parent_id=ANY($1::uuid[]) GROUP BY kind,state ORDER BY kind",[bulkIds])).rows;
+ check('500 source LOTs convert atomically without exceeding order quantity',()=>{assert.equal(bulkResult.created,500);assert.equal(bulkResult.remaining,0);assert.equal(bulkResult.released,true);assert.deepEqual(bulkStates,[{kind:'operation',state:'WAIT',n:8500},{kind:'routing',state:'RELEASED',n:500}])});console.log('TRANSFER CAPACITY 500 LOT / 8500 operations (released) '+((Date.now()-started)/1000).toFixed(2)+'s');
+ return checks;
+}
+
+export async function sourceTransferRefTests(c){
+ const admin='11111111-1111-4111-8111-111111111111',checks=[];
+ const get=async id=>(await c.query('SELECT * FROM public.dnm_v4_records WHERE id=$1',[id])).rows[0];
+ const rpc=async(name,p,k=randomUUID())=>(await c.query('SELECT public.'+name+'($1,$2) r',[p,k])).rows[0].r;
+ const pass=(label,fn)=>{fn();checks.push(label);console.log('REFS PASS '+label)};
+ await c.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[admin]);
+ const source=(await c.query("INSERT INTO public.dnm_v4_records(kind,code,title,state,data) VALUES('source_routing','TEST-REFS','LOT-REFS','REFERENCE','{\"lot\":\"LOT-REFS\",\"part_no\":\"TEST-REFS\",\"part_name\":\"시험\",\"qty\":null}') RETURNING *")).rows[0];
+ const result=await rpc('dnm_v4103_convert_sources',{rows:[{id:source.id,version:source.version,values:{qty:5,current_state:'NOT_STARTED'}}],part_no:'TEST-REFS',part_type:'',order:{customer:'시험',part_no:'TEST-REFS',part_name:'시험',qty:5},plan_date:'2026-11-12',manager_id:admin,steps:[{code:'010',name:'가공',kind:'WORK',independent:true}],release:true,reviewed:true,skip_invalid:false,allow_missing_refs:true,reason:'현물 확인'});
+ let route=await get(result.lots[0].route_id);const before=(await c.query('SELECT to_jsonb(r) row FROM public.dnm_v4_records r WHERE parent_id=$1 ORDER BY id',[route.id])).rows;
+ const payload={id:route.id,version:route.version,shop_order_no:'SO-FILLED',heat_code:'HEAT-FILLED',reason:'원본 문서 대조'},key=randomUUID(),saved=await rpc('dnm_v4103_route_refs',payload,key);route=await get(route.id);
+ pass('missing S/O and Heat are filled and pending marker clears',()=>{assert.equal(route.data.shop_order_no,'SO-FILLED');assert.equal(route.data.heat_code,'HEAT-FILLED');assert.equal(route.data.document_refs_pending,false)});
+ const order=await get(result.order_id);pass('empty parent S/O is filled without quantity change',()=>{assert.equal(order.data.shop_order_no,'SO-FILLED');assert.equal(order.data.qty,5)});
+ const revised=await get(source.id),original={...revised.data};delete original.mes_transfer;
+ pass('reference correction preserves original and updates reviewed metadata only',()=>{assert.deepEqual(original,source.data);assert.equal(revised.data.mes_transfer.review.heat_code,'HEAT-FILLED');assert.equal(route.data.document_ref_history.length,1)});
+ const after=(await c.query('SELECT to_jsonb(r) row FROM public.dnm_v4_records r WHERE parent_id=$1 ORDER BY id',[route.id])).rows;pass('document correction never alters process or production quantities',()=>assert.deepEqual(after,before));
+ assert.deepEqual(await rpc('dnm_v4103_route_refs',payload,key),saved);pass('same correction request does not duplicate history',()=>{});
+ await assert.rejects(()=>rpc('dnm_v4103_route_refs',payload),/변경/);pass('stale correction cannot overwrite later change',()=>{});
+ await assert.rejects(()=>rpc('dnm_v4103_route_refs',{...payload,version:route.version,shop_order_no:'WRONG'}),/수주/);pass('S/O mismatch against parent order is rejected',()=>{});
+ await c.query("SELECT set_config('request.jwt.claim.sub','44444444-4444-4444-8444-444444444444',false)");
+ await assert.rejects(()=>rpc('dnm_v4103_route_refs',{...payload,version:route.version}),/관리자/);pass('non-admin reference corrections are rejected',()=>{});
+ return checks;
+}
